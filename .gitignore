@@ -4,3 +4,4 @@ __pycache__/
 .env
 ACTIVATION_GUIDE.md
 demo.ipynb # For now, until I set it up correctly.
+forgeNN/legacy/
