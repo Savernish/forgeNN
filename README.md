@@ -1,21 +1,40 @@
 # forgeNN
-*A From Scratch Neural Network Framework with Educational Purposes*
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [Architecture](#architecture)
+- [Performance](#performance)
+- [Complete Example](#complete-example)
+- [Contributing](#contributing)
+- [Acknowledgments](#acknowledgments)
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![NumPy](https://img.shields.io/badge/powered_by-NumPy-blue.svg)](https://numpy.org/)
+[![PyPI version](https://img.shields.io/pypi/v/forgeNN.svg)](https://pypi.org/project/forgeNN/)
+[![Downloads](https://img.shields.io/pypi/dm/forgeNN.svg)](https://pypi.org/project/forgeNN/)
+[![License](https://img.shields.io/pypi/l/forgeNN.svg)](https://pypi.org/project/forgeNN/)
 
-##  Overview
+## Installation
+
+```bash
+pip install forgeNN
+```
+
+## Overview
 
 **forgeNN** is a modern neural network framework that is developed by a solo developer learning about ML. Features vectorized operations for high-speed training.
 
 ### Key Features
 
-- ** Vectorized Operations**: NumPy-powered batch processing (100x+ speedup)
-- ** Dynamic Computation Graphs**: Automatic differentiation with gradient tracking
-- ** Complete Neural Networks**: From simple neurons to complex architectures
-- ** Production Loss Functions**: Cross-entropy, MSE with numerical stability
+- **Vectorized Operations**: NumPy-powered batch processing (100x+ speedup)
+- **Dynamic Computation Graphs**: Automatic differentiation with gradient tracking
+- **Complete Neural Networks**: From simple neurons to complex architectures
+- **Production Loss Functions**: Cross-entropy, MSE with numerical stability
 
-##  Quick Start
+## Quick Start
 
 ### High-Performance Training
 
@@ -48,63 +67,43 @@ for epoch in range(10):
     print(f"Epoch {epoch}: Loss = {loss.data:.4f}, Acc = {acc*100:.1f}%")
 ```
 
-### Legacy Examples
-
-```python
-# For learning automatic differentiation
-from forgeNN.legacy import Value, MLP
-
-x = Value(2.0)
-y = x**2 + 3*x + 1
-y.backward()
-print(f"dy/dx = {x.grad}")  # 7.0
-
-# Simple neural network
-model = MLP(2, [4, 1])
-output = model([Value(1.0), Value(2.0)])
-```
-
-##  Architecture
+## Architecture
 
 - **Main API**: `forgeNN.Tensor`, `forgeNN.VectorizedMLP` (production use)
-- **Legacy API**: `forgeNN.legacy.*` (backward compatible)
+- **Legacy API**: `forgeNN.legacy.*` (educational purposes)
 - **Functions**: Complete activation and loss function library
 - **Examples**: `example.py` - Complete MNIST classification demo
 
-##  Performance
+## Performance
 
-| Implementation | Speed |
-|---------------|-------|
-| Vectorized | 38,000+ samples/sec | 
+| Implementation | Speed | MNIST Accuracy |
+|---------------|-------|----------------|
+| Vectorized | 38,000+ samples/sec | 93%+ in <2s |
 
+**Highlights**:
+- **100x+ speedup** over scalar implementations
+- **Production-ready** performance with educational clarity
+- **Memory efficient** vectorized operations
 
-**MNIST Results**: 93%+ accuracy in under 2 seconds!
-
-##  Complete Example
+## Complete Example
 
 See `example.py` for a full MNIST classification demo achieving professional results.
 
-##  Contributing
+## Links
+
+- **PyPI Package**: https://pypi.org/project/forgeNN/
+- **Documentation**: See guides in this repository
+- **Issues**: GitHub Issues for bug reports and feature requests
+
+## Contributing
 
 I am not currently accepting contributions, but I'm always open to suggestions and feedback!
 
-## 📦 PyPI Deployment
-
-This package is ready for PyPI deployment! All deployment files are organized in the `deployment/` directory to keep the main project clean.
-
-```bash
-# Build and deploy to PyPI
-cd deployment
-python build_package.py
-python upload_package.py
-```
-
-For detailed deployment instructions, see `deployment/DEPLOY.md`.
-
-## 🌟 Acknowledgments
+## Acknowledgments
 
 - Inspired by educational automatic differentiation tutorials
 - Built for both learning and production use
 - Optimized with modern NumPy practices
+- **Available on PyPI**: `pip install forgeNN`
 
 ---
