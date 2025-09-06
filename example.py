@@ -1,9 +1,17 @@
 """
-Vectorized MNIST Demo - High Performance Version
-===============================================
+forgeNN MNIST Classification Example
+===================================
 
-Demonstrates the dramatic speedup achieved with vectorized operations.
-This version should be 10-100x faster than the scalar implementation.
+Complete example demonstrating high-performance neural network training
+with forgeNN's vectorized implementation.
+
+Features:
+- MNIST handwritten digit classification
+- Vectorized operations for fast training
+- Batch processing with progress tracking
+- Professional metrics and evaluation
+
+Performance: 93%+ accuracy in under 2 seconds!
 """
 
 import numpy as np

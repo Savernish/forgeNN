@@ -20,7 +20,7 @@ Example:
     >>> loss.backward()
 """
 
-from forgeNN.core import Value
+from .core import Value
 import random
 
 class Module:

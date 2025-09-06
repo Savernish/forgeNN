@@ -10,8 +10,8 @@ Copyright (c) 2025 forgeNN Development Team
 Licensed under MIT License
 """
 
-from .functions.activation import RELU, LRELU, TANH, SIGMOID, SWISH
-from .functions.loss import MSE, CrossEntropy
+from ..functions.activation import RELU, LRELU, TANH, SIGMOID, SWISH
+from ..functions.loss import MSE, CrossEntropy
 
 class Value:
     """
