@@ -103,50 +103,50 @@ Based on comprehensive comparison with PyTorch and NumPy:
 ### CRITICAL MISSING FEATURES (High Priority):
 
 1. TENSOR SHAPE OPERATIONS:
-   - reshape()      : Change tensor dimensions (tensor.reshape(2, -1))
-   - transpose()    : Swap dimensions (tensor.transpose(0, 1))  
-   - view()         : Memory-efficient reshape (tensor.view(-1, 5))
-   - flatten()      : Convert to 1D (tensor.flatten())
-   - squeeze()      : Remove size-1 dims (tensor.squeeze())
-   - unsqueeze()    : Add size-1 dims (tensor.unsqueeze(0))
+   - `reshape()`      : Change tensor dimensions (tensor.reshape(2, -1))
+   - `transpose()`    : Swap dimensions (tensor.transpose(0, 1))  
+   - `view()`         : Memory-efficient reshape (tensor.view(-1, 5))
+   - `flatten()`      : Convert to 1D (tensor.flatten())
+   - `squeeze()`      : Remove size-1 dims (tensor.squeeze())
+   - `unsqueeze()`    : Add size-1 dims (tensor.unsqueeze(0))
 
 2. MATRIX OPERATIONS:
-   - matmul() / @   : Matrix multiplication with broadcasting
-   - dot()          : Vector dot product
+   - `matmul()` / `@`  : Matrix multiplication with broadcasting
+   - `dot()`          : Vector dot product
 
 3. TENSOR COMBINATION:
-   - cat()          : Join along existing dim (torch.cat([a, b], dim=0))
-   - stack()        : Join along new dim (torch.stack([a, b]))
+   - `cat()`          : Join along existing dim (torch.cat([a, b], dim=0))
+   - `stack()`        : Join along new dim (torch.stack([a, b]))
 
 ### IMPORTANT FEATURES (Medium Priority):
 
 4. ADVANCED ACTIVATIONS:
-   - ✓ lrelu()       : AVAILABLE as forgeNN.functions.activation.LRELU (needs fixing)
-   - ✓ swish()       : AVAILABLE as forgeNN.functions.activation.SWISH (needs fixing)  
-   - gelu()         : Gaussian Error Linear Unit (missing)
-   - elu()          : Exponential Linear Unit (missing)
+   - `lrelu()`       : AVAILABLE as `forgeNN.functions.activation.LRELU` (needs fixing)
+   - `swish()`       : AVAILABLE as `forgeNN.functions.activation.SWISH` (needs fixing)  
+   - `gelu()`         : Gaussian Error Linear Unit (missing)
+   - `elu()`          : Exponential Linear Unit (missing)
 
 5. TENSOR UTILITIES:
-   - split()        : Split into chunks
-   - chunk()        : Split into equal pieces
-   - permute()      : Rearrange dimensions
+   - `split()`        : Split into chunks
+   - `chunk()`        : Split into equal pieces
+   - `permute()`      : Rearrange dimensions
 
 6. INDEXING:
-   - Boolean indexing: tensor[tensor > 0]
-   - Fancy indexing: tensor[indices]
-   - gather()       : Select along dimension
+   - Boolean indexing: `tensor[tensor > 0]`
+   - Fancy indexing: `tensor[indices]`
+   - `gather()`       : Select along dimension
 
 ### NICE-TO-HAVE (Lower Priority):
 
 7. LINEAR ALGEBRA:
-   - norm()         : Vector/matrix norms
-   - det()          : Matrix determinant
-   - inverse()      : Matrix inverse
+   - `norm()`         : Vector/matrix norms
+   - `det()`          : Matrix determinant
+   - `inverse()`      : Matrix inverse
 
 8. CONVENIENCE:
-   - clone()        : Deep copy
-   - detach()       : Remove from computation graph
-   - requires_grad_(): In-place grad requirement change
+   - `clone()`        : Deep copy
+   - `detach()`       : Remove from computation graph
+   - `requires_grad_()`: In-place grad requirement change
 
 9. INFRASTRUCTURE:
    - Better error messages for shape mismatches
