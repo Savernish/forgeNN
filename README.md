@@ -1,23 +1,21 @@
 # forgeNN
-*A High-Performance Neural Network Framework with Educational Foundations*
+*A From Scratch Neural Network Framework with Educational Purposes*
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![NumPy](https://img.shields.io/badge/powered_by-NumPy-blue.svg)](https://numpy.org/)
 
-## 🚀 Overview
+##  Overview
 
-**forgeNN** is a modern neural network framework combining production performance with educational transparency. Features both vectorized operations for high-speed training and scalar implementations for learning.
+**forgeNN** is a modern neural network framework that is developed by a solo developer learning about ML. Features vectorized operations for high-speed training.
 
 ### Key Features
 
-- **⚡ Vectorized Operations**: NumPy-powered batch processing (100x+ speedup)
-- **🔥 Dynamic Computation Graphs**: Automatic differentiation with gradient tracking
-- **🧠 Complete Neural Networks**: From simple neurons to complex architectures
-- **🎯 Production Loss Functions**: Cross-entropy, MSE with numerical stability
-- **🚀 Modern Optimizers**: SGD with momentum, extensible architecture
-- **📚 Educational Design**: Transparent scalar implementations for learning
+- ** Vectorized Operations**: NumPy-powered batch processing (100x+ speedup)
+- ** Dynamic Computation Graphs**: Automatic differentiation with gradient tracking
+- ** Complete Neural Networks**: From simple neurons to complex architectures
+- ** Production Loss Functions**: Cross-entropy, MSE with numerical stability
 
-## ⚡ Quick Start
+##  Quick Start
 
 ### High-Performance Training
 
@@ -50,7 +48,7 @@ for epoch in range(10):
     print(f"Epoch {epoch}: Loss = {loss.data:.4f}, Acc = {acc*100:.1f}%")
 ```
 
-### Educational Examples
+### Legacy Examples
 
 ```python
 # For learning automatic differentiation
@@ -66,33 +64,42 @@ model = MLP(2, [4, 1])
 output = model([Value(1.0), Value(2.0)])
 ```
 
-## 🏗️ Architecture
+##  Architecture
 
 - **Main API**: `forgeNN.Tensor`, `forgeNN.VectorizedMLP` (production use)
-- **Legacy API**: `forgeNN.legacy.*` (educational, backward compatible)
+- **Legacy API**: `forgeNN.legacy.*` (backward compatible)
 - **Functions**: Complete activation and loss function library
 - **Examples**: `example.py` - Complete MNIST classification demo
 
-## 📊 Performance
+##  Performance
 
-| Implementation | Speed | Use Case |
-|---------------|-------|----------|
-| Vectorized | 38,000+ samples/sec | Production, large datasets |
-| Scalar | ~400 samples/sec | Education, understanding |
+| Implementation | Speed |
+|---------------|-------|
+| Vectorized | 38,000+ samples/sec | 
+
 
 **MNIST Results**: 93%+ accuracy in under 2 seconds!
 
-## 🚀 Complete Example
+##  Complete Example
 
 See `example.py` for a full MNIST classification demo achieving professional results.
 
-## 🤝 Contributing
+##  Contributing
+
+I am not currently accepting contributions, but I'm always open to suggestions and feedback!
+
+## 📦 PyPI Deployment
+
+This package is ready for PyPI deployment! All deployment files are organized in the `deployment/` directory to keep the main project clean.
 
 ```bash
-git clone https://github.com/Savernish/forgeNN.git
-cd forgeNN
-python example.py  # Run the demo!
+# Build and deploy to PyPI
+cd deployment
+python build_package.py
+python upload_package.py
 ```
+
+For detailed deployment instructions, see `deployment/DEPLOY.md`.
 
 ## 🌟 Acknowledgments
 
@@ -101,5 +108,3 @@ python example.py  # Run the demo!
 - Optimized with modern NumPy practices
 
 ---
-
-**Fast, Educational, and Production-Ready** 🚀
