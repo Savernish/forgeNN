@@ -9,11 +9,34 @@ while maintaining API compatibility.
 Classes:
     VectorizedLayer: Efficient layer implementation using matrix operations
     VectorizedMLP: Fast multi-layer perceptron for batch training
+    VectorizedOptimizer: SGD optimizer with momentum support
 """
 
 import numpy as np
 from .tensor import Tensor
-from typing import List, Optional
+from typing import List, Optional, Union, Callable
+from .functions.activation import RELU, LRELU, TANH, SIGMOID, SWISH
+
+# Activation function mapping for unified activation system
+ACTIVATION_FUNCTIONS = {
+    # String-based activations
+    'relu': lambda x: x.relu(),
+    'sigmoid': lambda x: x.sigmoid(), 
+    'tanh': lambda x: x.tanh(),
+    'linear': lambda x: x,
+    'lrelu': lambda x: x.leaky_relu(),
+    'swish': lambda x: x.swish(),
+    
+    # Class-based activations (new integration)
+    RELU: lambda x: x.relu(),
+    LRELU: lambda x: x.leaky_relu(),
+    TANH: lambda x: x.tanh(),
+    SIGMOID: lambda x: x.sigmoid(),
+    SWISH: lambda x: x.swish(),
+    
+    # Direct callable support
+    'function': lambda x, fn: fn(x)
+}
 
 class VectorizedLayer:
     """
@@ -35,15 +58,29 @@ class VectorizedLayer:
     Args:
         input_size (int): Number of input features
         output_size (int): Number of output neurons
-        activation (str): Activation function ('relu', 'sigmoid', 'tanh', 'linear')
+        activation (str or class or callable): Activation function. Supports:
+            - Strings: 'relu', 'sigmoid', 'tanh', 'linear', 'lrelu', 'swish'
+            - Classes: RELU, LRELU, TANH, SIGMOID, SWISH from forgeNN.functions.activation
+            - Callable: Any function that takes a Tensor and returns a Tensor
         
     Attributes:
         weights (Tensor): Weight matrix (input_size, output_size)
         bias (Tensor): Bias vector (output_size,)
-        activation (str): Activation function type
+        activation: Activation function or string identifier
+        
+    Example:
+        >>> # String-based activation names
+        >>> layer1 = VectorizedLayer(784, 128, 'relu')
+        >>> 
+        >>> # Activation class instances
+        >>> layer2 = VectorizedLayer(128, 64, LRELU)
+        >>> 
+        >>> # Custom function
+        >>> layer3 = VectorizedLayer(64, 10, lambda x: x.sigmoid())
     """
     
-    def __init__(self, input_size: int, output_size: int, activation: str = 'linear'):
+    def __init__(self, input_size: int, output_size: int, 
+                 activation: Union[str, type, Callable] = 'linear'):
         """Initialize layer with Xavier/Glorot weight initialization."""
         # Xavier initialization for better training dynamics
         fan_in = input_size
@@ -65,17 +102,31 @@ class VectorizedLayer:
         # Linear transformation: x @ W + b
         output = x @ self.weights + self.bias
         
-        # Apply activation function
-        if self.activation == 'relu':
-            return output.relu()
-        elif self.activation == 'sigmoid':
-            return output.sigmoid()
-        elif self.activation == 'tanh':
-            return output.tanh()
-        elif self.activation == 'linear':
-            return output
+        # Apply activation function using unified system
+        return self._apply_activation(output)
+    
+    def _apply_activation(self, x: Tensor) -> Tensor:
+        """Apply activation function in a unified way."""
+        if callable(self.activation) and not isinstance(self.activation, type):
+            # Direct callable (lambda, function) or activation class instance
+            if hasattr(self.activation, 'forward'):
+                # Activation class instance (e.g., RELU(), SWISH())
+                return self.activation.forward(x)
+            else:
+                # Regular callable (lambda, function)
+                return self.activation(x)
+        elif self.activation in ACTIVATION_FUNCTIONS:
+            # String or class-based activation
+            return ACTIVATION_FUNCTIONS[self.activation](x)
+        elif type(self.activation) in ACTIVATION_FUNCTIONS:
+            # Instance of activation class - get the class and apply
+            return ACTIVATION_FUNCTIONS[type(self.activation)](x)
+        elif hasattr(x, str(self.activation)):
+            # Method name on tensor (e.g., 'relu', 'sigmoid')
+            return getattr(x, str(self.activation))()
         else:
-            raise ValueError(f"Unknown activation: {self.activation}")
+            raise ValueError(f"Unknown activation: {self.activation}. "
+                           f"Supported: {list(ACTIVATION_FUNCTIONS.keys())}")
     
     def parameters(self) -> List[Tensor]:
         """Return all trainable parameters."""
@@ -99,11 +150,23 @@ class VectorizedMLP:
         input_size (int): Input feature dimensionality
         hidden_sizes (List[int]): List of hidden layer sizes
         output_size (int): Output dimensionality
-        activations (List[str], optional): Activation per layer
+        activations (List[str or class or callable], optional): Activation per layer. 
+            
+            **Recommended: Use string names for simplicity and consistency**
+            - Strings: 'relu', 'sigmoid', 'tanh', 'linear', 'leaky_relu', 'swish'
+            - Classes: RELU(), LRELU(), TANH(), SIGMOID(), SWISH() (advanced control)
+            - Callables: Custom functions (maximum flexibility)
+            - Mixed: Can combine different types, but strings are preferred
         
     Example:
-        >>> # Create model for MNIST classification
-        >>> model = VectorizedMLP(784, [128, 64], 10)
+        >>> # String-based activation names (recommended)
+        >>> model = VectorizedMLP(784, [128, 64], 10, ['relu', 'swish', 'linear'])
+        >>> 
+        >>> # Activation class instances (advanced control)
+        >>> model = VectorizedMLP(784, [128, 64], 10, [RELU(), SWISH(), None])
+        >>> 
+        >>> # Custom functions (maximum flexibility)
+        >>> model = VectorizedMLP(784, [128, 64], 10, ['relu', lambda x: x.swish(beta=2.0), 'sigmoid'])
         >>> 
         >>> # Batch forward pass
         >>> batch_x = Tensor(np.random.randn(32, 784))  # 32 samples
@@ -115,7 +178,7 @@ class VectorizedMLP:
     """
     
     def __init__(self, input_size: int, hidden_sizes: List[int], output_size: int,
-                 activations: Optional[List[str]] = None):
+                 activations: Optional[List[Union[str, type, Callable]]] = None):
         """Initialize vectorized MLP with specified architecture."""
         layer_sizes = [input_size] + hidden_sizes + [output_size]
         

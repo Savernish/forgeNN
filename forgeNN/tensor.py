@@ -189,6 +189,37 @@ class Tensor:
         out._backward = _backward
         return out
     
+    def leaky_relu(self, alpha=0.01):
+        """Vectorized Leaky ReLU activation."""
+        out_data = np.where(self.data > 0, self.data, alpha * self.data)
+        out = Tensor(out_data, requires_grad=self.requires_grad,
+                    _children=(self,), _op=f'leaky_relu({alpha})')
+        
+        def _backward():
+            if self.requires_grad:
+                grad_mask = np.where(self.data > 0, 1.0, alpha)
+                self.grad += grad_mask * out.grad
+        
+        out._backward = _backward
+        return out
+    
+    def swish(self, beta=1.0):
+        """Vectorized Swish activation: x * sigmoid(beta * x)."""
+        sigmoid_input = beta * self.data
+        sigmoid_data = 1 / (1 + np.exp(-np.clip(sigmoid_input, -500, 500)))
+        out_data = self.data * sigmoid_data
+        out = Tensor(out_data, requires_grad=self.requires_grad,
+                    _children=(self,), _op=f'swish({beta})')
+        
+        def _backward():
+            if self.requires_grad:
+                # Swish derivative: sigmoid(βx) + x * β * sigmoid(βx) * (1 - sigmoid(βx))
+                swish_grad = sigmoid_data + self.data * beta * sigmoid_data * (1 - sigmoid_data)
+                self.grad += swish_grad * out.grad
+        
+        out._backward = _backward
+        return out
+    
     def sum(self, axis=None, keepdims=False):
         """Sum tensor along specified axis."""
         out_data = np.sum(self.data, axis=axis, keepdims=keepdims)
@@ -397,19 +428,19 @@ class Tensor:
     def squeeze(self, dim: Optional[int] = None) -> 'Tensor':
         """Remove dimensions of size 1.
     
-    Args:
-        dim: If specified, only squeeze this dimension if it has size 1.
-             If None, squeeze all dimensions with size 1.
-             
-    Returns:
-        New tensor with size-1 dimensions removed.
-        
-    Examples:
-        x = Tensor(np.ones((3, 1, 4, 1)))
-        x.squeeze()      # Shape: (3, 4)
-        x.squeeze(1)     # Shape: (3, 4, 1) 
-        x.squeeze(3)     # Shape: (3, 1, 4)
-    """
+        Args:
+            dim: If specified, only squeeze this dimension if it has size 1.
+                If None, squeeze all dimensions with size 1.
+                
+        Returns:
+            New tensor with size-1 dimensions removed.
+            
+        Examples:
+            x = Tensor(np.ones((3, 1, 4, 1)))
+            x.squeeze()      # Shape: (3, 4)
+            x.squeeze(1)     # Shape: (3, 4, 1) 
+            x.squeeze(3)     # Shape: (3, 1, 4)
+        """
         if dim is None:
             # Remove ALL dimensions with size 1
             # Use np.squeeze() without axis parameter

@@ -85,9 +85,8 @@ for epoch in range(10):
 
 ## Architecture
 
-- **Main API**: `forgeNN.Tensor`, `forgeNN.VectorizedMLP` (production use)
-- **Legacy API**: `forgeNN.legacy.*` (educational purposes)
-- **Functions**: Complete activation and loss function library
+- **Main API**: `forgeNN.Tensor`, `forgeNN.VectorizedMLP` (high-performance neural networks)
+- **Activation Functions**: `forgeNN.RELU`, `forgeNN.SWISH`, etc. + string/callable support
 - **Examples**: `example.py` - Complete MNIST classification demo
 
 ## Performance
