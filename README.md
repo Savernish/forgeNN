@@ -4,7 +4,7 @@
 
 - [Installation](#installation)
 - [Overview](#overview)
-- [🔥 Performance vs PyTorch](#performance-vs-pytorch)
+- [Performance vs PyTorch](#performance-vs-pytorch)
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
 - [Performance](#performance)
