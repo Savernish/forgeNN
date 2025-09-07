@@ -150,6 +150,13 @@ tests/
 data/
 benchmark_mnist.py
 
+# Package and deployment files (personal use only)
+build_package.py
+upload_package.py
+setup.py
+pyproject.toml
+dev_check.py
+demo_comparison.py
 
 # Deployment folder (personal pip deployment only)
 deployment/
