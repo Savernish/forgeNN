@@ -36,7 +36,7 @@ pip install forgeNN
 - **Complete Neural Networks**: From simple neurons to complex architectures
 - **Production Loss Functions**: Cross-entropy, MSE with numerical stability
 
-## 🔥 Performance vs PyTorch
+## Performance vs PyTorch
 
 **forgeNN is 3.52x faster than PyTorch on small models!**
 
@@ -118,15 +118,15 @@ Based on comprehensive comparison with PyTorch and NumPy:
 ### CRITICAL MISSING FEATURES (High Priority):
 
 1. TENSOR SHAPE OPERATIONS:
-   - `reshape()`      : Change tensor dimensions (tensor.reshape(2, -1))
-   - `transpose()`    : Swap dimensions (tensor.transpose(0, 1))  
-   - `view()`         : Memory-efficient reshape (tensor.view(-1, 5))
-   - `flatten()`      : Convert to 1D (tensor.flatten())
-   - `squeeze()`      : Remove size-1 dims (tensor.squeeze())
-   - `unsqueeze()`    : Add size-1 dims (tensor.unsqueeze(0))
+   - `reshape()`      : Change tensor dimensions (tensor.reshape(2, -1)) - COMPLETED
+   - `transpose()`    : Swap dimensions (tensor.transpose(0, 1)) - COMPLETED
+   - `view()`         : Memory-efficient reshape (tensor.view(-1, 5)) - COMPLETED
+   - `flatten()`      : Convert to 1D (tensor.flatten()) - COMPLETED
+   - `squeeze()`      : Remove size-1 dims (tensor.squeeze()) - COMPLETED
+   - `unsqueeze()`    : Add size-1 dims (tensor.unsqueeze(0)) - COMPLETED
 
 2. MATRIX OPERATIONS:
-   - `matmul()` / `@`  : Matrix multiplication with broadcasting
+   - `matmul()` / `@`  : Matrix multiplication with broadcasting - COMPLETED
    - `dot()`          : Vector dot product
 
 3. TENSOR COMBINATION:
@@ -145,6 +145,7 @@ Based on comprehensive comparison with PyTorch and NumPy:
    - `split()`        : Split into chunks
    - `chunk()`        : Split into equal pieces
    - `permute()`      : Rearrange dimensions
+   - `contiguous()` : Make tensor memory-contiguous (tensor.contiguous()) - COMPLETED
 
 6. INDEXING:
    - Boolean indexing: `tensor[tensor > 0]`
