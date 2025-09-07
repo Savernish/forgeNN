@@ -250,7 +250,16 @@ class Tensor:
             return Tensor(self.data.reshape(new_shape), requires_grad=self.requires_grad)
         
         if -1 in new_shape:
-            inferred_dim = int(self.size // np.prod([d for d in new_shape if d != -1]))
+            # Check for zero dimensions first
+            non_neg_dims = [d for d in new_shape if d != -1]
+            if 0 in non_neg_dims:
+                # If any dimension is 0, the inferred dimension must be 0 (for empty tensor) or error
+                if self.size == 0:
+                    inferred_dim = 0
+                else:
+                    raise ValueError(f"Cannot reshape tensor of size {self.size} to shape with zero dimension")
+            else:
+                inferred_dim = int(self.size // np.prod(non_neg_dims))
             new_shape = tuple(inferred_dim if d == -1 else d for d in new_shape)
         if np.prod(new_shape) != self.size:
             raise ValueError(f"Cannot reshape tensor of size {self.size} to shape {new_shape}")
@@ -269,7 +278,201 @@ class Tensor:
         """Convert tensor to 1D by flattening all dimensions."""
         return self.reshape(-1)
 
+    def view(self, *new_shape) -> 'Tensor':
+        """Reshape tensor to new shape using shared memory. Supports -1 for inferring dimension.
+        Accepts either a tuple or multiple integer arguments."""
+        # Support both view((2,3)) and view(2,3)
+        if len(new_shape) == 1 and isinstance(new_shape[0], (tuple, list)):
+            new_shape = tuple(new_shape[0])
+        else:
+            new_shape = tuple(new_shape)
+        
+        # Edge case: Multiple -1s in shape (should raise error)
+        if new_shape.count(-1) > 1:
+            raise ValueError("Only one dimension can be inferred (-1)")
+        
+        # Edge case: Empty tensor case
+        if self.size == 0:
+            return Tensor(self.data.view().reshape(new_shape), requires_grad=self.requires_grad)
+        
+        # Check if tensor is contiguous in memory
+        if not self.data.flags['C_CONTIGUOUS']:
+            raise RuntimeError("view() requires contiguous tensor. Use reshape() instead or call contiguous() first.")
+        
+        if -1 in new_shape:
+            # Check for zero dimensions first
+            non_neg_dims = [d for d in new_shape if d != -1]
+            if 0 in non_neg_dims:
+                # If any dimension is 0, the inferred dimension must be 0 (for empty tensor) or error
+                if self.size == 0:
+                    inferred_dim = 0
+                else:
+                    raise ValueError(f"Cannot view tensor of size {self.size} to shape with zero dimension")
+            else:
+                inferred_dim = int(self.size // np.prod(non_neg_dims))
+            new_shape = tuple(inferred_dim if d == -1 else d for d in new_shape)
+        if np.prod(new_shape) != self.size:
+            raise ValueError(f"Cannot view tensor of size {self.size} to shape {new_shape}")
+        
+        # Create view using shared memory
+        out_data = self.data.view()
+        out_data = out_data.reshape(new_shape)
+        
+        # Create output tensor manually to preserve memory sharing
+        out = Tensor.__new__(Tensor)  # Create without calling __init__
+        out.data = out_data  # Don't copy, use the view directly
+        out.grad = np.zeros_like(out.data) if self.requires_grad else None
+        out.requires_grad = self.requires_grad
+        out.shape = out.data.shape
+        out.size = out.data.size
+        out._children = set((self,))
+        out._op = 'view'
+        out._backward = lambda: None
+        
+        def _backward():
+            if self.requires_grad:
+                # Reshape gradient back to original shape (same as reshape)
+                reshaped_grad = out.grad.reshape(self.data.shape)
+                self.grad += reshaped_grad
+        
+        out._backward = _backward
+        return out
 
+    def contiguous(self) -> 'Tensor':
+        """Return a contiguous tensor with the same data.
+        If the tensor is already contiguous, returns self.
+        Otherwise, returns a copy with contiguous memory layout."""
+        if self.data.flags['C_CONTIGUOUS']:
+            return self  # Already contiguous, no need to copy
+        
+        # Create contiguous copy
+        contiguous_data = np.ascontiguousarray(self.data)
+        out = Tensor(contiguous_data, requires_grad=self.requires_grad,
+                    _children=(self,), _op='contiguous')
+        
+        def _backward():
+            if self.requires_grad:
+                # Simply copy gradients back (same shape)
+                self.grad += out.grad
+        
+        out._backward = _backward
+        return out
+        
+    def transpose(self, *axes) -> 'Tensor':
+        """Transpose tensor dimensions. 
+        
+        Args:
+            *axes: Either individual dimension indices (e.g., transpose(0, 1)) 
+                   or no arguments for default transpose
+                   
+        Examples:
+            tensor.transpose()      # Reverse all dimensions  
+            tensor.transpose(0, 1)  # Swap dimensions 0 and 1
+            tensor.transpose(2, 0, 1)  # Permute dimensions
+        """
+        if len(axes) == 0:
+            # Default transpose: reverse all dimensions
+            axes = tuple(reversed(range(len(self.shape))))
+        elif len(axes) == 1 and isinstance(axes[0], (tuple, list)):
+            # Handle tuple input: transpose((0, 1))
+            axes = tuple(axes[0])
+        else:
+            # Handle individual arguments: transpose(0, 1)
+            axes = tuple(axes)
+            
+        out_data = self.data.transpose(axes)
+        out = Tensor(out_data, requires_grad=self.requires_grad,
+                    _children=(self,), _op='transpose')
+
+        def _backward():
+            if self.requires_grad:
+                # Inverse transpose: if we transposed with axes, 
+                # we need to undo it with the inverse permutation
+                inverse_axes = tuple(np.argsort(axes))
+                self.grad += out.grad.transpose(inverse_axes)
+
+        out._backward = _backward
+        return out
+
+    def squeeze(self, dim: Optional[int] = None) -> 'Tensor':
+        """Remove dimensions of size 1.
+    
+    Args:
+        dim: If specified, only squeeze this dimension if it has size 1.
+             If None, squeeze all dimensions with size 1.
+             
+    Returns:
+        New tensor with size-1 dimensions removed.
+        
+    Examples:
+        x = Tensor(np.ones((3, 1, 4, 1)))
+        x.squeeze()      # Shape: (3, 4)
+        x.squeeze(1)     # Shape: (3, 4, 1) 
+        x.squeeze(3)     # Shape: (3, 1, 4)
+    """
+        if dim is None:
+            # Remove ALL dimensions with size 1
+            # Use np.squeeze() without axis parameter
+            out_data = np.squeeze(self.data)
+            squeezed_dims = [i for i, s in enumerate(self.shape) if s == 1]
+        else:
+            if dim < 0:
+                dim += len(self.shape)
+            if dim < 0 or dim >= len(self.shape):
+                raise IndexError(f"Dimension {dim} out of range for tensor with {len(self.shape)} dimensions")
+            if self.shape[dim] != 1:
+                raise ValueError(f"Cannot squeeze dimension {dim} with size {self.shape[dim]}. Only size-1 dimensions can be squeezed.")
+            # Remove the specific dimension
+            out_data = np.squeeze(self.data, axis=dim)  
+            squeezed_dims = [dim]  # Remember which dim was squeezed for gradient
+        out = Tensor(out_data, requires_grad=self.requires_grad,
+                    _children=(self,), _op='squeeze')
+        
+        def _backward():
+            if self.requires_grad:
+                if dim is None:
+                    grad = out.grad
+                    # Expand dimensions back in correct order - must use ascending order
+                    # so that indices don't shift as we add dimensions
+                    for d in sorted(squeezed_dims):
+                        grad = np.expand_dims(grad, axis=d)
+                    self.grad += grad
+                else:
+                    self.grad += np.expand_dims(out.grad, axis=dim)
+        
+        out._backward = _backward
+        return out
+    
+    def unsqueeze(self, dim: int) -> 'Tensor':
+        """Add dimension of size 1 at specified position.
+    
+        Args:
+            dim: Position where to insert the new dimension.
+                Can be negative (counted from the end).
+                
+        Returns:
+            New tensor with size-1 dimension added.
+            
+        Examples:
+            x = Tensor(np.ones((3, 4)))
+            x.unsqueeze(0)   # Shape: (1, 3, 4)
+            x.unsqueeze(1)   # Shape: (3, 1, 4)
+            x.unsqueeze(-1)  # Shape: (3, 4, 1)
+        """
+        if dim < 0:
+            dim = len(self.shape) + 1 + dim
+        if dim < 0 or dim > len(self.shape):
+            raise IndexError(f"Dimension {dim} out of range for inserting into tensor with {len(self.shape)} dimensions")
+        out_data = np.expand_dims(self.data, axis=dim)
+        out = Tensor(out_data, requires_grad=self.requires_grad,
+                    _children=(self,), _op='unsqueeze')
+        def _backward():
+            if self.requires_grad:
+                # Remove the dimension we added
+                self.grad += np.squeeze(out.grad, axis=dim)
+        out._backward = _backward
+        return out
+        
     def mse_loss(self, target):
         """Vectorized Mean Squared Error loss."""
         target = self._ensure_tensor(target)

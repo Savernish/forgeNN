@@ -1,0 +1,156 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "forgeNN"
+version = "1.0.3"
+authors = [
+    {name = "Savernish"},
+]
+description = "A From Scratch Neural Network Framework with Educational Purposes"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research", 
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Education",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
+keywords = [
+    "neural-networks",
+    "machine-learning", 
+    "deep-learning",
+    "education",
+    "automatic-differentiation",
+    "numpy",
+    "vectorized",
+    "from-scratch",
+    "ai",
+    "artificial-intelligence",
+]
+dependencies = [
+    "numpy>=1.20.0",
+    "scikit-learn>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "sphinx>=4.0.0", 
+    "sphinx-rtd-theme>=1.0.0",
+    "black>=22.0.0",
+    "flake8>=4.0.0",
+    "mypy>=0.950",
+    "twine>=4.0.0",
+    "build>=0.8.0",
+]
+examples = [
+    "matplotlib>=3.5.0",
+    "jupyter>=1.0.0",
+]
+all = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0", 
+    "sphinx>=4.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "black>=22.0.0",
+    "flake8>=4.0.0",
+    "mypy>=0.950",
+    "twine>=4.0.0",
+    "build>=0.8.0",
+    "matplotlib>=3.5.0", 
+    "jupyter>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Savernish/forgeNN"
+Documentation = "https://github.com/Savernish/forgeNN/blob/main/README.md"
+Repository = "https://github.com/Savernish/forgeNN.git"
+"Bug Reports" = "https://github.com/Savernish/forgeNN/issues"
+Changelog = "https://github.com/Savernish/forgeNN/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["forgeNN*"]
+exclude = ["tests*", "docs*"]
+
+[tool.setuptools.package-data]
+forgeNN = ["*.md", "*.txt"]
+
+# Black configuration
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+# Pytest configuration
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--cov=forgeNN",
+    "--cov-report=html",
+    "--cov-report=term-missing",
+    "--strict-markers",
+    "--disable-warnings",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+
+# MyPy configuration
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "sklearn.*",
+    "matplotlib.*",
+    "numpy.*",
+]
+ignore_missing_imports = true

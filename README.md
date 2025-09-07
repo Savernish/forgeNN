@@ -4,6 +4,7 @@
 
 - [Installation](#installation)
 - [Overview](#overview)
+- [🔥 Performance vs PyTorch](#performance-vs-pytorch)
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
 - [Performance](#performance)
@@ -34,6 +35,20 @@ pip install forgeNN
 - **Dynamic Computation Graphs**: Automatic differentiation with gradient tracking
 - **Complete Neural Networks**: From simple neurons to complex architectures
 - **Production Loss Functions**: Cross-entropy, MSE with numerical stability
+
+## 🔥 Performance vs PyTorch
+
+**forgeNN is 3.52x faster than PyTorch on small models!**
+
+| Metric | PyTorch | forgeNN | Advantage |
+|--------|---------|---------|-----------|
+| Training Time (MNIST) | 64.72s | 30.84s | **2.10x faster** ⚡ |
+| Test Accuracy | 97.30% | 97.37% | **+0.07% better** |
+| Small Models (<109k params) | Baseline | **3.52x faster** | **Massive speedup** 🚀 |
+
+📊 **[See Full Comparison Guide](COMPARISON_GUIDE.md)** for detailed benchmarks, syntax differences, and when to use each framework.
+
+![MNIST Benchmark Results](mnist_benchmark_comparison.png)
 
 ## Quick Start
 

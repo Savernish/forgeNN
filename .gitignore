@@ -137,23 +137,38 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# PyPI Deployment Files (keep these local only)
+# Temporary/Development Files
+*.tmp
+*.temp
+*_temp.py
+*_test_*.py
+stress_test*.py
+edge_test*.py
+interactive_test*.py
+simple_test*.py
+tests/
+data/
+benchmark_mnist.py
+
+
+# Deployment folder (personal pip deployment only)
 deployment/
-pyproject.toml
-setup.py
-MANIFEST.in
-LICENSE
-CHANGELOG.md
-INSTALL.md
-DEPLOY.md
-QUICK_DEPLOY.md
-build_package.py
-upload_package.py
-ORGANIZATION.md
-TODO.md
 
-# Project specific
-demo.ipynb # For now, until I set it up correctly.
+# Documentation files to ignore (keep only README.md and COMPARISON_GUIDE.md)
+*.md
+!README.md
+!COMPARISON_GUIDE.md
 
-# Temporary files to exclude
-ACTIVATION_GUIDE.md
+# Data directories (keep structure but not data)
+data/*
+!data/.gitkeep
+
+# Generated plots and outputs
+*.png
+*.jpg
+*.jpeg
+*.pdf
+!mnist_benchmark_comparison.png  # Keep this important benchmark image
+
+# Project specific temporary files
+demo.ipynb

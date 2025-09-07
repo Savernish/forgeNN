@@ -204,10 +204,6 @@ def main():
     print(f"   • {time_per_sample*1000:.2f} ms per sample")
     print(f"   • Trained {total_params:,} parameters efficiently")
     
-    # Estimate speedup vs scalar version
-    estimated_scalar_time = time_per_sample * 100  # Conservative estimate
-    speedup = estimated_scalar_time / time_per_sample
-    print(f"   • Estimated {speedup:.0f}x speedup vs scalar implementation")
 
 if __name__ == "__main__":
     main()
