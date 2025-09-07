@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2025-09-07
+
+### 🧹 MAJOR CLEANUP - Legacy Removal
+- **REMOVED**: Entire `forgeNN.legacy` module - no longer maintained
+- **REMOVED**: Backward compatibility code and comments
+- **CLEAN**: Simplified API focused on modern, high-performance components
+- **FOCUS**: Pure vectorized operations for maximum speed
+
+### ✨ Enhanced
+- **Unified activation system**: String/class/callable activations fully integrated
+- **Cleaner documentation**: Removed outdated legacy references
+- **Modern API**: Streamlined imports and cleaner codebase
+
+## [1.0.5] - 2025-09-07
+
+### Added
+- **Activation function integration**: Full tensor integration for all activation functions
+- **New tensor methods**: `leaky_relu()` and `swish()` with proper gradients
+- **Enhanced VectorizedLayer**: Supports string, class, and callable activations
+- **Clean loss API**: Removed confusing `functions.loss` module
+
 ## [1.0.4] - 2025-09-07
 
 ### Added

@@ -166,7 +166,7 @@ deployment/
 !README.md
 !COMPARISON_GUIDE.md
 !CHANGELOG.md
-
+benchmark_tests/
 # Data directories (keep structure but not data)
 data/*
 !data/.gitkeep
