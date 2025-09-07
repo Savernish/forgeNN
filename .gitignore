@@ -150,6 +150,7 @@ QUICK_DEPLOY.md
 build_package.py
 upload_package.py
 ORGANIZATION.md
+TODO.md
 
 # Project specific
 demo.ipynb # For now, until I set it up correctly.

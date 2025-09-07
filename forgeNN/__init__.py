@@ -31,5 +31,5 @@ from .vectorized import VectorizedMLP, VectorizedOptimizer, cross_entropy_loss, 
 # Legacy API is available as forgeNN.legacy
 from . import legacy
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 __all__ = ['Tensor', 'VectorizedMLP', 'VectorizedOptimizer', 'cross_entropy_loss', 'accuracy', 'legacy']

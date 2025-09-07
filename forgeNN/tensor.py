@@ -40,6 +40,7 @@ class Tensor:
         grad (np.ndarray): The computed gradients (same shape as data)
         requires_grad (bool): Whether gradients are computed
         shape (tuple): Shape of the tensor
+        size (int): Total number of elements in the tensor
         
     Example:
         >>> import numpy as np
@@ -65,6 +66,7 @@ class Tensor:
         self._children = set(_children)
         self._op = _op
         self._backward = lambda: None
+        self.size = self.data.size
     
     def __repr__(self):
         return f"Tensor(shape={self.shape}, requires_grad={self.requires_grad})"
@@ -230,6 +232,44 @@ class Tensor:
         out._backward = _backward
         return out
     
+    def reshape(self, *new_shape) -> 'Tensor':   
+        """Reshape tensor to new shape. Supports -1 for inferring dimension.
+        Accepts either a tuple or multiple integer arguments."""
+        # Support both reshape((2,3)) and reshape(2,3)
+        if len(new_shape) == 1 and isinstance(new_shape[0], (tuple, list)):
+            new_shape = tuple(new_shape[0])
+        else:
+            new_shape = tuple(new_shape)
+        
+        # Edge case: Multiple -1s in shape (should raise error)
+        if new_shape.count(-1) > 1:
+            raise ValueError("Only one dimension can be inferred (-1)")
+        
+        # Edge case: Empty tensor case
+        if self.size == 0:
+            return Tensor(self.data.reshape(new_shape), requires_grad=self.requires_grad)
+        
+        if -1 in new_shape:
+            inferred_dim = int(self.size // np.prod([d for d in new_shape if d != -1]))
+            new_shape = tuple(inferred_dim if d == -1 else d for d in new_shape)
+        if np.prod(new_shape) != self.size:
+            raise ValueError(f"Cannot reshape tensor of size {self.size} to shape {new_shape}")
+        out_data = self.data.reshape(new_shape)
+        out = Tensor(out_data, requires_grad=self.requires_grad,
+                    _children=(self,), _op='reshape')
+        def _backward():
+            if self.requires_grad:
+                # Reshape gradient back to original shape
+                reshaped_grad = out.grad.reshape(self.data.shape)
+                self.grad += reshaped_grad
+        out._backward = _backward
+        return out
+
+    def flatten(self) -> 'Tensor':
+        """Convert tensor to 1D by flattening all dimensions."""
+        return self.reshape(-1)
+
+
     def mse_loss(self, target):
         """Vectorized Mean Squared Error loss."""
         target = self._ensure_tensor(target)
@@ -336,8 +376,7 @@ class Tensor:
         """Convert scalar or array to Tensor if needed."""
         if not isinstance(other, Tensor):
             return Tensor(other, requires_grad=False)
-        return other
-    
+        return other 
     # Operator overloads for convenience
     def __sub__(self, other):
         return self + (-other)
