@@ -2,16 +2,16 @@
 
 ## Table of Contents
 
-- [Installation](#installation)
-- [Overview](#overview)
-- [Performance vs PyTorch](#performance-vs-pytorch)
-- [Quick Start](#quick-start)
-- [Architecture](#architecture)
-- [Performance](#performance)
-- [Complete Example](#complete-example)
-- [TODO List](#todo-list)
-- [Contributing](#contributing)
-- [Acknowledgments](#acknowledgments)
+- [Installation](#Installation)
+- [Overview](#Overview)
+- [Performance vs PyTorch](#Performance-vs-PyTorch)
+- [Quick Start](#Quick-Start)
+- [Architecture](#Architecture)
+- [Performance](#Performance)
+- [Complete Example](#Complete-Example)
+- [TODO List](#TODO-List)
+- [Contributing](#Contributing)
+- [Acknowledgments](#Acknowledgments)
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![NumPy](https://img.shields.io/badge/powered_by-NumPy-blue.svg)](https://numpy.org/)
@@ -42,9 +42,9 @@ pip install forgeNN
 
 | Metric | PyTorch | forgeNN | Advantage |
 |--------|---------|---------|-----------|
-| Training Time (MNIST) | 64.72s | 30.84s | **2.10x faster** ⚡ |
+| Training Time (MNIST) | 64.72s | 30.84s | **2.10x faster** |
 | Test Accuracy | 97.30% | 97.37% | **+0.07% better** |
-| Small Models (<109k params) | Baseline | **3.52x faster** | **Massive speedup** 🚀 |
+| Small Models (<109k params) | Baseline | **3.52x faster** | **Massive speedup** |
 
 📊 **[See Full Comparison Guide](COMPARISON_GUIDE.md)** for detailed benchmarks, syntax differences, and when to use each framework.
 
