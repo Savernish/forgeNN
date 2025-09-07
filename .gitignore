@@ -170,12 +170,12 @@ deployment/
 data/*
 !data/.gitkeep
 
-# Generated plots and outputs
+# Generated plots and outputs (keep specific important files)
 *.png
+!mnist_benchmark_comparison.png
 *.jpg
 *.jpeg
 *.pdf
-!mnist_benchmark_comparison.png  # Keep this important benchmark image
 
 # Project specific temporary files
 demo.ipynb
