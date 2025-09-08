@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-09-08
+
+### Added
+- High-level layering API:
+  - `Layer` base class and `ActivationWrapper` using the `@` operator to attach activations
+  - `Sequential` container for ordered composition of layers
+  - `Dense` (lazy init) and `Flatten` layers
+  - Placeholders for `Conv2D` and `MaxPool2D` (raise NotImplementedError for now)
+- Keras-like trainer utilities:
+  - `compile(model, optimizer, loss, metrics)` returning a `CompiledModel`
+  - `fit`, `evaluate`, and `predict` helpers
+  - Built-in loss registry (`cross_entropy`) and metric registry (`accuracy`)
+- Documentation & guides:
+  - New `SEQUENTIAL_GUIDE.md` explaining the Sequential API with comparisons to PyTorch and Keras
+  - New `TRAINING_GUIDE.md` mapping Keras/PyTorch training to `compile/fit`
+  - Updated `README.md` with `compile/fit` examples and guide links
+- Examples:
+  - New `examples/sequential_mnist.py` using `Sequential` and `compile/fit`
+  - Updated `examples/benchmark_mnist.py` to use `Sequential + compile/fit` while keeping PyTorch comparison and plots
+- Testing:
+  - Expanded unit tests for `Sequential`, `Dense` lazy init, activation handling (string/class/callable), `Flatten`, nested `Sequential.zero_grad`, and optimizer momentum buffers
+  - Ensured optimizer works with lazy-initialized `Dense` by performing a dummy forward prior to optimizer construction
+- Public API:
+  - Exported `Sequential`, `Dense`, `Flatten`, `ActivationWrapper`, and `compile` from the top-level package
+
+### Changed
+- Trainer stability and metric aggregation:
+  - `CompiledModel.fit`/`evaluate` now aggregate loss and metrics weighted by batch size
+  - `evaluate` computes accuracy via total correct/total samples for exact dataset accuracy
+- Benchmark updates:
+  - `examples/benchmark_mnist.py` now seeds NumPy for reproducibility and uses batch size 64
+  - Per-epoch metrics are collected via `evaluate` to reduce jitter in plots
+- Documentation/docstrings:
+  - Comprehensive docstrings across `tensor.py` and `vectorized.py` with cleaned examples
+  - Fixed `cross_entropy_loss` docstring to show correct gradient shape `(2, 2)`
+
+### Deprecated
+- Direct use of `VectorizedMLP`+manual training loops in examples in favor of `Sequential + compile/fit`
+  - These APIs remain available for 1.x but are slated for removal/refactor in a future 2.x release
+- Legacy training snippets in guides superseded by `compile/fit` sections
+
+### Fixed
+- Accuracy wobble in benchmarks by switching to sample-weighted aggregation and exact accuracy counting
+- Lazy-init + optimizer ordering issue in tests by adding a dummy forward before optimizer/trainer creation
+
+### Security
+- No security-related changes in this release
+
+## [1.1.1] - 2025-09-08
+### Added
+- Added comprehensive documentation for all of the methods. Now the API is fully documented. If you see any missing docstrings, please open an issue.
+- Added `elu()` activation function with proper tensor integration
+- Added unit tests for `elu()` function
+
+### Fixed
+- 
+
 ## [1.1.0.1] - 2025-09-08
 ### Added
 - Added `dot()` method for 1D tensor dot product with autograd support

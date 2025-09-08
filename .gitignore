@@ -165,6 +165,7 @@ deployment/
 *.md
 !README.md
 !COMPARISON_GUIDE.md
+!SEQUENTIAL_GUIDE.md
 !CHANGELOG.md
 benchmark_tests/
 # Data directories (keep structure but not data)
