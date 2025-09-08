@@ -9,7 +9,7 @@
 - [Architecture](#Architecture)
 - [Performance](#Performance)
 - [Complete Example](#Complete-Example)
-- [TODO List](#TODO-List)
+- [Roadmap](#Roadmap)
 - [Contributing](#Contributing)
 - [Acknowledgments](#Acknowledgments)
 
@@ -105,9 +105,8 @@ loss, metrics = compiled.evaluate(X, y)
 
 ## Architecture
 
-- **Main API**: `forgeNN.Tensor`, `forgeNN.VectorizedMLP` (high-performance neural networks)
-- **Activation Functions**: `forgeNN.RELU`, `forgeNN.SWISH`, etc. + string/callable support
-- **Examples**: `example.py` - Complete MNIST classification demo
+- **Main API**: `forgeNN`, `forgeNN.Tensor`, `forgeNN.VectorizedMLP`
+- **Examples**: Check `examples/` for MNIST and more
 
 ## Performance
 
@@ -122,7 +121,7 @@ loss, metrics = compiled.evaluate(X, y)
 
 ## Complete Example
 
-See `example.py` for a full MNIST classification demo achieving professional results.
+See `examples/` for full fledged demos
 
 ## Links
 
@@ -131,71 +130,9 @@ See `example.py` for a full MNIST classification demo achieving professional res
 - **Guides**: SEQUENTIAL_GUIDE.md, TRAINING_GUIDE.md, COMPARISON_GUIDE.md
 - **Issues**: GitHub Issues for bug reports and feature requests
 
-## TODO List
+## Roadmap
 
-Based on comprehensive comparison with PyTorch and NumPy:
-
-### CRITICAL MISSING FEATURES (High Priority):
-
-1. ~TENSOR SHAPE OPERATIONS:~ - COMPLETED
-   - `reshape()`      : Change tensor dimensions (tensor.reshape(2, -1)) - COMPLETED
-   - `transpose()`    : Swap dimensions (tensor.transpose(0, 1)) - COMPLETED
-   - `view()`         : Memory-efficient reshape (tensor.view(-1, 5)) - COMPLETED
-   - `flatten()`      : Convert to 1D (tensor.flatten()) - COMPLETED
-   - `squeeze()`      : Remove size-1 dims (tensor.squeeze()) - COMPLETED
-   - `unsqueeze()`    : Add size-1 dims (tensor.unsqueeze(0)) - COMPLETED
-
-2. ~MATRIX OPERATIONS:~ - COMPLETED
-   - `matmul()` / `@`  : Matrix multiplication with broadcasting - COMPLETED
-   - `dot()`          : Vector dot product for 1D arrays - COMPLETED
-
-3. TENSOR COMBINATION:
-   - `cat()`          : Join along existing dim (torch.cat([a, b], dim=0))
-   - `stack()`        : Join along new dim (torch.stack([a, b]))
-
-### IMPORTANT FEATURES (Medium Priority):
-
-4. ADVANCED ACTIVATIONS:
-   - `lrelu()`       : AVAILABLE as `forgeNN.functions.activation.LRELU` (needs fixing) - FIXED
-   - `swish()`       : AVAILABLE as `forgeNN.functions.activation.SWISH` (needs fixing) - FIXED
-   - `gelu()`         : Gaussian Error Linear Unit (missing) - ADDED
-   - `elu()`          : Exponential Linear Unit (missing)
-
-5. TENSOR UTILITIES:
-   - `split()`        : Split into chunks
-   - `chunk()`        : Split into equal pieces
-   - `permute()`      : Rearrange dimensions
-   - `contiguous()` : Make tensor memory-contiguous (tensor.contiguous()) - COMPLETED
-
-6. INDEXING:
-   - Boolean indexing: `tensor[tensor > 0]`
-   - Fancy indexing: `tensor[indices]`
-   - `gather()`       : Select along dimension
-
-### NICE-TO-HAVE (Lower Priority):
-
-7. LINEAR ALGEBRA:
-   - `norm()`         : Vector/matrix norms
-   - `det()`          : Matrix determinant
-   - `inverse()`      : Matrix inverse
-
-8. CONVENIENCE:
-   - `clone()`        : Deep copy
-   - `detach()`       : Remove from computation graph
-   - `requires_grad_()`: In-place grad requirement change
-
-9. INFRASTRUCTURE:
-   - Better error messages for shape mismatches
-   - Memory-efficient operations
-   - API consistency improvements
-   - Comprehensive documentation
-
-### PRIORITY ORDER:
-1. Shape operations (reshape, transpose, flatten)
-2. Matrix multiplication (matmul, @)  
-3. Tensor combination (cat, stack)
-4. More activations (leaky_relu, gelu)
-5. Documentation and error handling
+_To be implemented_
 
 ## Contributing
 
