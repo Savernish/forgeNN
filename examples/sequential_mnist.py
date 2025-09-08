@@ -71,9 +71,7 @@ def main():
     # Initialize lazily constructed params for all layers
     _ = model(fnn.Tensor(np.zeros((1, 784), dtype=np.float32)))
 
-    params = model.parameters()
-    total_params = sum(p.data.size for p in params)
-    print(f"Total parameters: {total_params:,}")
+    print(f"Total parameters: {model.num_parameters():,}")
 
     # Compile with built-in loss/metric and optimizer config
     compiled = fnn.compile(

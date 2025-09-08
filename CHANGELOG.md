@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `compile(model, optimizer, loss, metrics)` returning a `CompiledModel`
   - `fit`, `evaluate`, and `predict` helpers
   - Built-in loss registry (`cross_entropy`) and metric registry (`accuracy`)
+  - Mean Squared Error loss (`mse`) implemented in `forgeNN.vectorized` and registered in the trainer loss registry (usable via `loss="mse"` in `compile`)
 - Documentation & guides:
   - New `SEQUENTIAL_GUIDE.md` explaining the Sequential API with comparisons to PyTorch and Keras
   - New `TRAINING_GUIDE.md` mapping Keras/PyTorch training to `compile/fit`
@@ -42,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation/docstrings:
   - Comprehensive docstrings across `tensor.py` and `vectorized.py` with cleaned examples
   - Fixed `cross_entropy_loss` docstring to show correct gradient shape `(2, 2)`
+ - Demo notebook training settings tuned for small datasets (increased epochs, reduced batch size, slightly higher learning rate) and updated to use the current `evaluate(X, y)` signature
 
 ### Deprecated
 - Direct use of `VectorizedMLP`+manual training loops in examples in favor of `Sequential + compile/fit`
@@ -51,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Accuracy wobble in benchmarks by switching to sample-weighted aggregation and exact accuracy counting
 - Lazy-init + optimizer ordering issue in tests by adding a dummy forward before optimizer/trainer creation
+ - Implemented `mse` using graph composition (`(pred - target)**2 .mean()`) to ensure correct gradient scaling across all elements and robust broadcasting
+ - Prevented unintended broadcasting for single-logit outputs by reshaping 1D targets `(N,)` to `(N, 1, ...)` when logits have singleton non-batch dimensions
 
 ### Security
 - No security-related changes in this release

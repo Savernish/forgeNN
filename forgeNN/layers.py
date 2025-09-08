@@ -44,6 +44,14 @@ class Layer:
     """
 
     def __call__(self, x: Tensor) -> Tensor:
+        """Apply the layer to input tensor ``x``.
+
+        Args:
+            x: Input tensor.
+
+        Returns:
+            Output tensor after the layer's forward computation.
+        """
         return self.forward(x)
 
     # Allow attaching activation: Layer @ "relu" -> ActivationWrapper(layer, "relu")
@@ -60,11 +68,35 @@ class Layer:
 
     # Default: non-parametric
     def parameters(self) -> List[Tensor]:
-        """Return trainable parameters (override in subclasses)."""
+        """Return trainable parameters (override in subclasses).
+
+        Returns:
+            A list of Tensors to be optimized.
+        """
         return []
+
+    def num_parameter_tensors(self) -> int:
+        """Return the number of parameter tensors.
+
+        Example:
+            >>> # Typically 2 per Dense layer (W, b)
+            >>> # so a 3-layer MLP often yields 6 tensors total.
+            >>> # Use ``num_parameters()`` for total scalar count instead.
+        """
+        return len(self.parameters())
+
+    def num_parameters(self) -> int:
+        """Return the total number of learnable scalars across all parameters.
+
+        Notes:
+            For lazily initialized layers (e.g., Dense without ``in_features``),
+            this may be 0 until the first forward pass initializes weights.
+        """
+        return sum(p.data.size for p in self.parameters())
 
     # Optional in advanced layers
     def forward(self, x: Tensor) -> Tensor:  # pragma: no cover - interface only
+        """Forward pass of the layer. Must be implemented by subclasses."""
         raise NotImplementedError
 
 
@@ -85,6 +117,13 @@ class ActivationWrapper(Layer):
         self.activation = activation
 
     def _apply_activation(self, x: Tensor) -> Tensor:
+        """Apply the configured activation to tensor ``x``.
+
+        Supports:
+            - String activations registered in the shared mapping
+            - Activation classes or instances (e.g., RELU)
+            - Arbitrary callables: ``fn(Tensor) -> Tensor``
+        """
         # Direct callable (not a class): fn(Tensor) -> Tensor
         if callable(self.activation) and not isinstance(self.activation, type):
             if hasattr(self.activation, 'forward'):
@@ -106,6 +145,7 @@ class ActivationWrapper(Layer):
         raise ValueError(f"Unknown activation: {self.activation}")
 
     def forward(self, x: Tensor) -> Tensor:
+        """Forward pass: layer(x) followed by activation."""
         return self._apply_activation(self.layer(x))
 
     def parameters(self) -> List[Tensor]:
@@ -134,18 +174,28 @@ class Sequential(Layer):
         self.layers: List[Layer] = list(layers)
 
     def forward(self, x: Tensor) -> Tensor:
+        """Apply layers in order to input ``x``.
+
+        Args:
+            x: Input tensor.
+
+        Returns:
+            Output tensor after all layers.
+        """
         out = x
         for layer in self.layers:
             out = layer(out)
         return out
 
     def parameters(self) -> List[Tensor]:
+        """Collect trainable parameters from all sub-layers."""
         params: List[Tensor] = []
         for layer in self.layers:
             params.extend(layer.parameters())
         return params
 
     def zero_grad(self) -> None:
+        """Set gradients of all parameters to zero in-place."""
         for p in self.parameters():
             p.zero_grad()
 
@@ -175,6 +225,7 @@ class Dense(Layer):
             self._init_params(in_features)
 
     def _init_params(self, in_features: int) -> None:
+        """Initialize weights with Xavier/Glorot uniform and zero bias."""
         import numpy as np
         fan_in, fan_out = in_features, self.out_features
         limit = float(np.sqrt(6.0 / (fan_in + fan_out)))
@@ -185,12 +236,18 @@ class Dense(Layer):
         self.b = Tensor([0.0] * self.out_features, requires_grad=True)
 
     def forward(self, x: Tensor) -> Tensor:
+        """Compute ``x @ W + b`` with lazy parameter initialization.
+
+        If ``in_features`` was omitted, the first call infers it from
+        ``x.shape[-1]`` and initializes parameters accordingly.
+        """
         if self.W is None or self.b is None:
             # Infer on first use; assume shape (N, D)
             self._init_params(x.shape[-1])
         return x @ self.W + self.b
 
     def parameters(self) -> List[Tensor]:
+        """Return the weight and bias tensors (if initialized)."""
         return [p for p in (self.W, self.b) if p is not None]
 
 
@@ -204,12 +261,17 @@ class Flatten(Layer):
     """
 
     def forward(self, x: Tensor) -> Tensor:
+        """Flatten all non-batch dimensions.
+
+        If input is already 2D or less, returns ``x`` unchanged.
+        """
         if len(x.shape) <= 2:
             return x
         batch = x.shape[0]
         return x.view(batch, -1)
 
     def parameters(self) -> List[Tensor]:
+        """Flatten has no trainable parameters."""
         return []
 
 

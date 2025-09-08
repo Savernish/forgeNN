@@ -20,7 +20,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tupl
 import numpy as np
 
 from .tensor import Tensor
-from .vectorized import VectorizedOptimizer, cross_entropy_loss, accuracy
+from .vectorized import VectorizedOptimizer, cross_entropy_loss, accuracy, mse
 
 
 # Registries for built-in losses and metrics
@@ -29,6 +29,7 @@ MetricFn = Callable[[Tensor, np.ndarray], float]
 
 LOSSES: Dict[str, LossFn] = {
     "cross_entropy": cross_entropy_loss,
+    "mse": mse,
 }
 
 METRICS: Dict[str, MetricFn] = {
@@ -48,7 +49,7 @@ class CompiledModel:
         is provided, a VectorizedOptimizer will be constructed lazily from
         model.parameters() on first use. If None, defaults to {"lr": 0.01}.
     loss: str | Callable
-        Either 'cross_entropy' or a custom callable loss(logits, targets)->Tensor.
+        Either 'cross_entropy', 'mse', or a custom callable loss(logits, targets)->Tensor.
     metrics: Sequence[str | Callable]
         Metric names ('accuracy') or callables taking (logits, targets)->float.
     """
@@ -93,6 +94,13 @@ class CompiledModel:
 
     @property
     def optimizer(self) -> VectorizedOptimizer:
+        """Return the underlying optimizer, constructing it lazily if needed.
+
+        Notes:
+            For lazily initialized layers (e.g., Dense without in_features),
+            ensure a dummy forward is run before first optimizer access so that
+            parameters() is populated.
+        """
         if self._optimizer is None:
             params = self.model.parameters()
             if not params:
@@ -103,6 +111,17 @@ class CompiledModel:
         return self._optimizer
 
     def _data_loader(self, X: np.ndarray, y: np.ndarray, batch_size: int, shuffle: bool):
+        """Yield mini-batches from arrays X and y.
+
+        Args:
+            X: Input features of shape (N, ...).
+            y: Targets of shape (N,).
+            batch_size: Number of samples per batch.
+            shuffle: Whether to shuffle before batching.
+
+        Yields:
+            Tuple[np.ndarray, np.ndarray]: (batch_X, batch_y)
+        """
         n = len(X)
         if shuffle:
             idx = np.random.permutation(n)
@@ -121,6 +140,20 @@ class CompiledModel:
         validation_data: Optional[Tuple[np.ndarray, np.ndarray]] = None,
         verbose: int = 1,
     ) -> None:
+        """Train the model for a fixed number of epochs.
+
+        Args:
+            X: Training features of shape (N, D).
+            y: Training labels of shape (N,).
+            epochs: Number of epochs to train.
+            batch_size: Batch size.
+            shuffle: Shuffle data each epoch.
+            validation_data: Optional tuple (X_val, y_val) for per-epoch validation.
+            verbose: 0 = silent, 1 = print epoch summary.
+
+        Notes:
+            Loss and metrics are aggregated sample-weighted across batches.
+        """
         for epoch in range(1, epochs + 1):
             # Sample-weighted aggregation to reduce jitter
             loss_sum = 0.0
@@ -162,6 +195,16 @@ class CompiledModel:
                 print(line)
 
     def evaluate(self, X: np.ndarray, y: np.ndarray, batch_size: int = 64) -> Tuple[float, Dict[str, float]]:
+        """Evaluate loss and metrics on a dataset.
+
+        Args:
+            X: Features of shape (N, D).
+            y: Targets of shape (N,).
+            batch_size: Batch size for evaluation.
+
+        Returns:
+            (loss, metrics): loss as float, metrics as dict (e.g., {'accuracy': 0.97}).
+        """
         # Sample-weighted aggregation and exact accuracy counting
         loss_sum = 0.0
         weight_sum = 0
@@ -194,6 +237,15 @@ class CompiledModel:
         return avg_loss, avg_metrics
 
     def predict(self, X: np.ndarray, batch_size: int = 256) -> np.ndarray:
+        """Run forward inference and return logits for X.
+
+        Args:
+            X: Features of shape (N, D).
+            batch_size: Batch size for inference.
+
+        Returns:
+            ndarray of shape (N, num_classes) with logits.
+        """
         outputs: List[np.ndarray] = []
         for bx, _ in self._data_loader(X, np.zeros(len(X)), batch_size, shuffle=False):
             logits = self.model(Tensor(bx, requires_grad=False))

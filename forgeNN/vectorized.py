@@ -328,6 +328,40 @@ class VectorizedOptimizer:
         for param in self.parameters:
             param.zero_grad()
 
+def mse(logits: Tensor, targets: Union[np.ndarray, Tensor]) -> Tensor:
+    """
+    Compute Mean Squared Error (MSE) loss.
+
+    This returns the mean over all elements, i.e., mean((logits - targets)^2).
+    Gradients are handled by the existing Tensor operations, ensuring
+    correct scaling over batch and feature dimensions and supporting broadcasting.
+    
+    Args:
+        logits (Tensor): Predictions of shape (N, D, ...)
+        targets (ndarray | Tensor): Targets broadcastable to logits' shape
+        
+    Returns:
+        Tensor: Scalar loss value connected to logits for backprop.
+
+    Example:
+        >>> preds = Tensor([[0.5, 0.2], [0.1, 0.4]])
+        >>> y = np.array([[1.0, 0.0], [0.0, 1.0]])
+        >>> loss = mse(preds, y)
+        >>> loss.backward()
+        >>> preds.grad.shape
+        (2, 2)
+    """
+    t = targets if isinstance(targets, Tensor) else Tensor(np.asarray(targets), requires_grad=False)
+    # Gracefully handle common binary/regression case where logits are (N,1)
+    # but targets are (N,). Avoid unintended (N,N) broadcasting.
+    if isinstance(t, Tensor):
+        if t.data.ndim == 1 and logits.data.ndim >= 2:
+            # If all non-batch dims of logits are singleton, reshape targets to match
+            if all(d == 1 for d in logits.data.shape[1:]):
+                t = Tensor(t.data.reshape((t.data.shape[0],) + logits.data.shape[1:]), requires_grad=False)
+    diff = logits - t
+    return (diff * diff).mean()
+
 def cross_entropy_loss(logits: Tensor, targets: np.ndarray) -> Tensor:
     """
     Compute cross-entropy loss for classification with numerical stability.

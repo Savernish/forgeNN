@@ -453,7 +453,7 @@ for epoch in range(10):
 
 ## Conclusion
 
-forgeNN v1.1.0 represents a **focused, modern approach** to neural network frameworks. Instead of trying to be everything to everyone, forgeNN excels in its chosen domain: **fast, clean, educational neural networks** for small-to-medium models.
+forgeNN v1.2.0 represents a **focused, modern approach** to neural network frameworks. Instead of trying to be everything to everyone, forgeNN excels in its chosen domain: **fast, clean, educational neural networks** for small-to-medium models.
 
 ### Key Takeaways
 -  **Proven Performance**: 2.8-4.5x faster than PyTorch on target use cases
@@ -478,7 +478,6 @@ forgeNN v1.1.0 represents a **focused, modern approach** to neural network frame
 
 ---
 
-**forgeNN v1.1.0 - Modern, fast, and focused. 🎯**
 
 *Perfect for researchers, educators, and developers who value performance, simplicity, and clarity.*
 
@@ -487,8 +486,5 @@ forgeNN v1.1.0 represents a **focused, modern approach** to neural network frame
 ### Resources
 
 - **Documentation**: Clear examples and API reference
-- **Benchmarks**: `python benchmark_tests/benchmark_mnist.py`
-- **Examples**: Complete MNIST classification in `example.py`
+- **Examples**: Check `examples/` for complete demos
 - **Source**: Clean, educational codebase you can understand
-
-**Get started today and experience the difference!** 🚀
