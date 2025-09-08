@@ -42,7 +42,7 @@ from .vectorized import VectorizedMLP, VectorizedOptimizer, cross_entropy_loss, 
 # Activation functions for advanced usage
 from .functions.activation import RELU, LRELU, TANH, SIGMOID, SWISH
 
-__version__ = "1.1.0"
+__version__ = "1.1.0.1"
 __all__ = [
     'Tensor', 'VectorizedMLP', 'VectorizedOptimizer', 'cross_entropy_loss', 'accuracy',
     'RELU', 'LRELU', 'TANH', 'SIGMOID', 'SWISH'
