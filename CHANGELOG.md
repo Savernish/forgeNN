@@ -7,20 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0.1] - 2025-09-08
+### Added
+- Added `dot()` method for 1D tensor dot product with autograd support
+- Added `GELU` activation function with proper tensor integration
+- Added unit tests for `dot()` and `GELU` functions
+
+### Fixed
+- Fixed minor bug in `VectorizedLayer` activation handling
+- Improved error messages for tensor shape operations
+- Enhanced documentation for new tensor methods
+
 ## [1.1.0] - 2025-09-07
 
-### 🧹 MAJOR CLEANUP - Legacy Removal
+### MAJOR CLEANUP - Legacy Removal
 - **REMOVED**: Entire `forgeNN.legacy` module - no longer maintained
 - **REMOVED**: Backward compatibility code and comments
 - **CLEAN**: Simplified API focused on modern, high-performance components
 - **FOCUS**: Pure vectorized operations for maximum speed
 
-### ✨ Enhanced
+### Enhanced
 - **Unified activation system**: String/class/callable activations fully integrated
 - **Cleaner documentation**: Removed outdated legacy references
 - **Modern API**: Streamlined imports and cleaner codebase
 
-## [1.0.5] - 2025-09-07
+## [1.0.4a0] - 2025-09-07
 
 ### Added
 - **Activation function integration**: Full tensor integration for all activation functions

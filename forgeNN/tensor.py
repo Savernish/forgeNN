@@ -161,6 +161,25 @@ class Tensor:
         out._backward = _backward
         return out
     
+    def gelu(self):
+        """Vectorized GELU activation with tanh approximation."""
+        out_data = 0.5 * self.data * (1 + np.tanh(np.sqrt(2 / np.pi) * (self.data + 0.044715 * self.data**3)))
+        out = Tensor(out_data, requires_grad=self.requires_grad,
+                    _children=(self,), _op='gelu')
+
+        def _backward():
+            if self.requires_grad:
+                x = self.data
+                tanh_arg = np.sqrt(2 / np.pi) * (x + 0.044715 * x**3)
+                tanh_val = np.tanh(tanh_arg)
+                left = 0.5 * tanh_val + 0.5
+                right = 0.5 * x * (1 - tanh_val**2) * np.sqrt(2 / np.pi) * (1 + 3 * 0.044715 * x**2)
+                gelu_grad = left + right
+                self.grad += gelu_grad * out.grad
+
+        out._backward = _backward
+        return out
+
     def sigmoid(self):
         """Vectorized sigmoid activation."""
         out_data = 1 / (1 + np.exp(-np.clip(self.data, -500, 500)))  # Numerical stability
@@ -263,6 +282,37 @@ class Tensor:
         out._backward = _backward
         return out
     
+    def dot(self, other) -> 'Tensor':
+        """Vectorized dot product for 1D tensors. It only supports 1D tensors intentionally just like pytorch.
+
+        Args:
+            other: The other tensor to perform the dot product with. Must be 1D.
+
+        Returns:
+            New tensor with dot product result.
+            
+        Examples:
+            x = Tensor(np.array([1.0, 2.0, 3.0]))  
+            y = Tensor(np.array([4.0, 5.0, 6.0]))  
+            z = x.dot(y)  # z.data = 32.0
+        """
+        #Ensure both tensors are 1D
+        if len(self.shape) != 1 or len(other.shape) != 1:
+            raise ValueError("Dot product is only supported for 1D tensors.")
+        if self.shape[0] != other.shape[0]:
+            raise ValueError("Tensors must have the same length for dot product.")
+        out_data = np.dot(self.data, other.data)
+        out = Tensor(out_data, requires_grad=self.requires_grad or other.requires_grad,
+                    _children=(self, other), _op='dot')
+        def _backward():
+            if self.requires_grad:
+                self.grad += other.data * out.grad
+            if other.requires_grad:
+                other.grad += self.data * out.grad
+        out._backward = _backward
+        return out
+
+
     def reshape(self, *new_shape) -> 'Tensor':   
         """Reshape tensor to new shape. Supports -1 for inferring dimension.
         Accepts either a tuple or multiple integer arguments."""
@@ -398,7 +448,7 @@ class Tensor:
                    
         Examples:
             tensor.transpose()      # Reverse all dimensions  
-            tensor.transpose(0, 1)  # Swap dimensions 0 and 1
+            tensor.transpose(0, 1)  # Swap dimensions 0 and 1  
             tensor.transpose(2, 0, 1)  # Permute dimensions
         """
         if len(axes) == 0:

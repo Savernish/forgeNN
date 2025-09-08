@@ -299,29 +299,26 @@ def cross_entropy_loss(logits: Tensor, targets: np.ndarray) -> Tensor:
     log_sum_exp = sum_exp.log()
     log_probs = shifted_logits - log_sum_exp
     
-    # Select probabilities for correct classes
-    targets_tensor = Tensor(targets, requires_grad=False)
+    # Select probabilities for correct classes and compute loss directly
     batch_indices = np.arange(batch_size)
-    selected_log_probs = Tensor(
-        log_probs.data[batch_indices, targets],
-        requires_grad=logits.requires_grad
-    )
+    selected_log_probs_data = log_probs.data[batch_indices, targets]
+    loss_data = -np.mean(selected_log_probs_data)
     
-    # Mean negative log likelihood
-    loss = -selected_log_probs.mean()
+    # Create loss tensor with proper computation graph
+    loss = Tensor(loss_data, requires_grad=logits.requires_grad,
+                  _children=(logits,), _op='cross_entropy')
     
-    # Manual backward pass for efficiency
+    # Proper backward pass that connects to the computation graph
     if logits.requires_grad:
         def _backward():
             # Softmax gradient
-            probs = (shifted_logits - log_sum_exp).exp()
-            grad = probs.data.copy()
+            probs = (shifted_logits - log_sum_exp).exp().data
+            grad = probs.copy()
             grad[batch_indices, targets] -= 1
             grad /= batch_size
-            logits.grad += grad
+            logits.grad += grad * loss.grad
         
         loss._backward = _backward
-        loss._children = {logits}
     
     return loss
 

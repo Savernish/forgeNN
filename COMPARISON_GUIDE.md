@@ -2,20 +2,20 @@
 
 > **forgeNN v1.1.0**: A lean, high-performance neural network framework that's **2.8x faster** than PyTorch on small-to-medium models
 
-## 🎯 Executive Summary
+## Executive Summary
 
 forgeNN is a modern, NumPy-based neural network framework designed for **performance and simplicity**. After removing all legacy code and focusing on our vectorized API, forgeNN now delivers consistent **2.8-4.5x speedup** over PyTorch while maintaining a clean, intuitive interface that's perfect for both education and production use.
 
 ### Key Advantages
-- ⚡ **2.8-4.5x faster** than PyTorch on small-medium models
-- 🧹 **Clean, modern API** - no legacy baggage
-- 🎯 **Unified activation system** - strings, classes, or custom functions
-- 📦 **Zero dependencies** except NumPy
-- 🚀 **Production-ready** with educational clarity
+- **2.8-4.5x faster** than PyTorch on small-medium models
+- **Clean, modern API** - no legacy baggage
+- **Unified activation system** - strings, classes, or custom functions
+- **Zero dependencies** except NumPy
+- **Production-ready** with educational clarity
 
 ---
 
-## 📊 Performance Benchmarks
+## Performance Benchmarks
 
 ### MNIST Classification (Updated v1.1.0)
 
@@ -26,10 +26,10 @@ forgeNN is a modern, NumPy-based neural network framework designed for **perform
 
 | Metric | PyTorch | forgeNN v1.1.0 | Advantage |
 |--------|---------|-----------------|-----------|
-| **Training Time** | 168.03s | 37.54s | **🚀 4.48x faster** |
-| **Avg Epoch Time** | 16.80s | 3.75s | **⚡ 4.48x faster** |
-| **Test Accuracy** | 97.43% | 97.82% | **📈 +0.39% better** |
-| **Train Accuracy** | 98.21% | 99.40% | **📈 +1.19% better** |
+| **Training Time** | 168.03s | 37.54s | ** 4.48x faster** |
+| **Avg Epoch Time** | 16.80s | 3.75s | ** 4.48x faster** |
+| **Test Accuracy** | 97.43% | 97.82% | ** +0.39% better** |
+| **Train Accuracy** | 98.21% | 99.40% | ** +1.19% better** |
 
 ### Wine Quality Multi-Task Learning
 
@@ -39,16 +39,16 @@ forgeNN is a modern, NumPy-based neural network framework designed for **perform
 
 | Metric | PyTorch | forgeNN v1.1.0 | Advantage |
 |--------|---------|-----------------|-----------|
-| **Training Time** | 0.554s | 0.195s | **🚀 2.84x faster** |
-| **Avg Epoch Time** | 11.1ms | 3.9ms | **⚡ 2.85x faster** |
-| **Classification Acc** | 96.30% | 96.30% | **🤝 Equal** |
-| **Regression R²** | 0.9951 | 0.9939 | **📊 Comparable** |
+| **Training Time** | 0.554s | 0.195s | ** 2.84x faster** |
+| **Avg Epoch Time** | 11.1ms | 3.9ms | ** 2.85x faster** |
+| **Classification Acc** | 96.30% | 96.30% | ** Equal** |
+| **Regression R²** | 0.9951 | 0.9939 | ** Comparable** |
 
 **Conclusion:** forgeNN consistently outperforms PyTorch in training speed while maintaining comparable or better accuracy.
 
 ---
 
-## 🔍 API Comparison - Clean & Modern
+## API Comparison - Clean & Modern
 
 ### 1. Model Definition
 
@@ -96,10 +96,10 @@ optimizer = forgeNN.VectorizedOptimizer(model.parameters(), lr=0.01, momentum=0.
 ```
 
 **Key Differences:**
-- ✅ **forgeNN**: Declarative architecture - no manual layer building
-- ✅ **forgeNN**: Built-in string activation system
-- ✅ **forgeNN**: No separate loss function needed
-- ✅ **forgeNN**: 8 lines vs 15 lines
+- **forgeNN**: Declarative architecture - no manual layer building
+- **forgeNN**: Built-in string activation system
+- **forgeNN**: No separate loss function needed
+- **forgeNN**: 8 lines vs 15 lines
 
 ### 2. Activation Function Flexibility
 
@@ -143,10 +143,10 @@ z = x.swish(beta=1.5)        # Custom beta
 ```
 
 **Key Differences:**
-- ✅ **forgeNN**: Multiple ways to specify activations
-- ✅ **forgeNN**: Easy custom parameters (`alpha`, `beta`)
-- ✅ **forgeNN**: No need for custom classes
-- ✅ **forgeNN**: Consistent API across all methods
+- **forgeNN**: Multiple ways to specify activations
+- **forgeNN**: Easy custom parameters (`alpha`, `beta`)
+- **forgeNN**: No need for custom classes
+- **forgeNN**: Consistent API across all methods
 
 ### 3. Training Loop
 
@@ -199,10 +199,10 @@ for epoch in range(epochs):
 ```
 
 **Key Differences:**
-- ✅ **forgeNN**: No manual reshaping or device management
-- ✅ **forgeNN**: Built-in `accuracy()` function
-- ✅ **forgeNN**: Cleaner data access (`loss.data`)
-- ✅ **forgeNN**: 12 lines vs 20 lines
+-  **forgeNN**: No manual reshaping or device management
+-  **forgeNN**: Built-in `accuracy()` function
+-  **forgeNN**: Cleaner data access (`loss.data`)
+-  **forgeNN**: 12 lines vs 20 lines
 
 ### 4. Performance-Critical Operations
 
@@ -233,14 +233,14 @@ batch_outputs = model(batch_data)  # Automatically vectorized
 ```
 
 **Key Differences:**
-- ✅ **forgeNN**: No device management complexity
-- ✅ **forgeNN**: Automatic memory optimization
-- ✅ **forgeNN**: CPU performance focus
-- ✅ **forgeNN**: Simpler deployment (no CUDA dependencies)
+-  **forgeNN**: No device management complexity
+-  **forgeNN**: Automatic memory optimization
+-  **forgeNN**: CPU performance focus
+-  **forgeNN**: Simpler deployment (no CUDA dependencies)
 
 ---
 
-## 🏗️ Architecture Philosophy
+## Architecture Philosophy
 
 ### PyTorch: Industrial Scale Framework
 - **Target**: Large-scale production ML with GPUs
@@ -256,7 +256,7 @@ batch_outputs = model(batch_data)  # Automatically vectorized
 
 ---
 
-## 🔬 Technical Implementation Advantages
+## Technical Implementation Advantages
 
 ### 1. Vectorized Operations
 
@@ -296,7 +296,7 @@ accuracy = forgeNN.accuracy(predictions, labels)
 
 ---
 
-## 📈 Performance Deep Dive
+## Performance Deep Dive
 
 ### Why forgeNN Wins on Small-Medium Models
 
@@ -336,7 +336,7 @@ accuracy = forgeNN.accuracy(predictions, labels)
 
 ---
 
-## 🎯 Real-World Use Cases
+## Real-World Use Cases
 
 ### forgeNN Success Scenarios
 
@@ -394,24 +394,24 @@ loss = forgeNN.cross_entropy_loss(outputs, targets)
 
 ---
 
-## 🔮 Framework Comparison Matrix
+## Framework Comparison Matrix
 
-| Feature | PyTorch | forgeNN v1.1.0 | Winner |
-|---------|---------|----------------|--------|
-| **Performance (Small Models)** | Good | **4.5x faster** | 🏆 forgeNN |
-| **Performance (Large Models)** | **Excellent** | Good | 🏆 PyTorch |
-| **API Simplicity** | Complex | **Simple** | 🏆 forgeNN |
-| **Dependencies** | Heavy | **NumPy only** | 🏆 forgeNN |
-| **GPU Support** | **Excellent** | None | 🏆 PyTorch |
-| **Model Zoo** | **Massive** | None | 🏆 PyTorch |
-| **Educational Value** | Good | **Excellent** | 🏆 forgeNN |
-| **Memory Usage** | High | **Low** | 🏆 forgeNN |
-| **Deployment Ease** | Complex | **Simple** | 🏆 forgeNN |
-| **Custom Operations** | Complex | **Simple** | 🏆 forgeNN |
+| Feature | PyTorch | forgeNN v1.1.0 |
+|---------|---------|----------------|
+| **Performance (Small Models)** | Good | **4.5x faster** |
+| **Performance (Large Models)** | **Excellent** | Good |
+| **API Simplicity** | Complex | **Simple** |
+| **Dependencies** | Heavy | **NumPy only** |
+| **GPU Support** | **Excellent** | None |
+| **Model Zoo** | **Massive** | None |
+| **Educational Value** | Good | **Excellent** |
+| **Memory Usage** | High | **Low** |
+| **Deployment Ease** | Complex | **Simple** |
+| **Custom Operations** | Complex | **Simple** |
 
 ---
 
-## 🛠️ Getting Started
+## Getting Started
 
 ### Installation & First Model
 
@@ -451,16 +451,16 @@ for epoch in range(10):
 
 ---
 
-## 🎉 Conclusion
+## Conclusion
 
 forgeNN v1.1.0 represents a **focused, modern approach** to neural network frameworks. Instead of trying to be everything to everyone, forgeNN excels in its chosen domain: **fast, clean, educational neural networks** for small-to-medium models.
 
 ### Key Takeaways
-- ⚡ **Proven Performance**: 2.8-4.5x faster than PyTorch on target use cases
-- 🧹 **Clean Design**: Modern API without legacy baggage  
-- 🎯 **Focused Scope**: Does fewer things, but does them exceptionally well
-- 📚 **Educational Excellence**: Perfect for learning and teaching
-- 🚀 **Production Ready**: Simple deployment with minimal dependencies
+-  **Proven Performance**: 2.8-4.5x faster than PyTorch on target use cases
+-  **Clean Design**: Modern API without legacy baggage  
+-  **Focused Scope**: Does fewer things, but does them exceptionally well
+-  **Educational Excellence**: Perfect for learning and teaching
+-  **Production Ready**: Simple deployment with minimal dependencies
 
 ### Choose forgeNN When You Want:
 - Fast training on small-medium models (< 1M parameters)
@@ -484,7 +484,7 @@ forgeNN v1.1.0 represents a **focused, modern approach** to neural network frame
 
 ---
 
-### 📚 Resources
+### Resources
 
 - **Documentation**: Clear examples and API reference
 - **Benchmarks**: `python benchmark_tests/benchmark_mnist.py`
