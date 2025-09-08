@@ -116,7 +116,7 @@ Based on comprehensive comparison with PyTorch and NumPy:
 
 ### CRITICAL MISSING FEATURES (High Priority):
 
-1. TENSOR SHAPE OPERATIONS:
+1. ~TENSOR SHAPE OPERATIONS:~ - COMPLETED
    - `reshape()`      : Change tensor dimensions (tensor.reshape(2, -1)) - COMPLETED
    - `transpose()`    : Swap dimensions (tensor.transpose(0, 1)) - COMPLETED
    - `view()`         : Memory-efficient reshape (tensor.view(-1, 5)) - COMPLETED
@@ -124,9 +124,9 @@ Based on comprehensive comparison with PyTorch and NumPy:
    - `squeeze()`      : Remove size-1 dims (tensor.squeeze()) - COMPLETED
    - `unsqueeze()`    : Add size-1 dims (tensor.unsqueeze(0)) - COMPLETED
 
-2. MATRIX OPERATIONS:
+2. ~MATRIX OPERATIONS:~ - COMPLETED
    - `matmul()` / `@`  : Matrix multiplication with broadcasting - COMPLETED
-   - `dot()`          : Vector dot product
+   - `dot()`          : Vector dot product for 1D arrays - COMPLETED
 
 3. TENSOR COMBINATION:
    - `cat()`          : Join along existing dim (torch.cat([a, b], dim=0))
@@ -135,9 +135,9 @@ Based on comprehensive comparison with PyTorch and NumPy:
 ### IMPORTANT FEATURES (Medium Priority):
 
 4. ADVANCED ACTIVATIONS:
-   - `lrelu()`       : AVAILABLE as `forgeNN.functions.activation.LRELU` (needs fixing)
-   - `swish()`       : AVAILABLE as `forgeNN.functions.activation.SWISH` (needs fixing)  
-   - `gelu()`         : Gaussian Error Linear Unit (missing)
+   - `lrelu()`       : AVAILABLE as `forgeNN.functions.activation.LRELU` (needs fixing) - FIXED
+   - `swish()`       : AVAILABLE as `forgeNN.functions.activation.SWISH` (needs fixing) - FIXED
+   - `gelu()`         : Gaussian Error Linear Unit (missing) - ADDED
    - `elu()`          : Exponential Linear Unit (missing)
 
 5. TENSOR UTILITIES:
@@ -182,7 +182,7 @@ I am not currently accepting contributions, but I'm always open to suggestions a
 
 ## Acknowledgments
 
-- Inspired by educational automatic differentiation tutorials
+- Inspired by educational automatic differentiation tutorials (micrograd)
 - Built for both learning and production use
 - Optimized with modern NumPy practices
 - **Available on PyPI**: `pip install forgeNN`

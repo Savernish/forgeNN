@@ -170,6 +170,8 @@ benchmark_tests/
 # Data directories (keep structure but not data)
 data/*
 !data/.gitkeep
+dev_examples/
+
 
 # Generated plots and outputs (keep specific important files)
 *.png
