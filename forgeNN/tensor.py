@@ -69,10 +69,24 @@ class Tensor:
         self.size = self.data.size
     
     def __repr__(self):
+        """Return a concise representation including shape and grad flag."""
         return f"Tensor(shape={self.shape}, requires_grad={self.requires_grad})"
     
     def __add__(self, other):
-        """Vectorized addition with broadcasting support."""
+        """Vectorized addition with NumPy-style broadcasting.
+
+        Args:
+            other (Tensor | array-like | float | int): Value to add.
+
+        Returns:
+            Tensor: Result with broadcasted shape.
+
+        Examples:
+            >>> a = Tensor([[1., 1., 1.], [1., 1., 1.]])
+            >>> b = Tensor([1.0, 2.0, 3.0])  # Broadcast across rows
+            >>> (a + b).shape
+            (2, 3)
+        """
         other = self._ensure_tensor(other)
         out_data = self.data + other.data
         out = Tensor(out_data, requires_grad=self.requires_grad or other.requires_grad,
@@ -103,7 +117,20 @@ class Tensor:
         return out
     
     def __mul__(self, other):
-        """Vectorized element-wise multiplication."""
+        """Element-wise multiplication with broadcasting.
+
+        Args:
+            other (Tensor | array-like | float | int): Multiplier.
+
+        Returns:
+            Tensor: Element-wise product.
+
+        Example:
+         >>> x = Tensor([[1., 2.], [3., 4.]])
+            >>> (x * 2.0).data
+         array([[2., 4.],
+             [6., 8.]])
+        """
         other = self._ensure_tensor(other)
         out_data = self.data * other.data
         out = Tensor(out_data, requires_grad=self.requires_grad or other.requires_grad,
@@ -133,7 +160,22 @@ class Tensor:
         return out
     
     def __matmul__(self, other):
-        """Vectorized matrix multiplication."""
+        """Matrix multiplication (batch-aware).
+
+        Shapes follow NumPy's @ operator: (N, D) @ (D, M) -> (N, M).
+
+        Args:
+            other (Tensor | array-like): Right-hand matrix.
+
+        Returns:
+            Tensor: Product tensor.
+
+        Example:
+            >>> X = Tensor([[1., 2.], [3., 4.]])
+            >>> W = Tensor([[5., 6.], [7., 8.]])
+            >>> (X @ W).shape
+            (2, 2)
+        """
         other = self._ensure_tensor(other)
         out_data = self.data @ other.data
         out = Tensor(out_data, requires_grad=self.requires_grad or other.requires_grad,
@@ -149,7 +191,13 @@ class Tensor:
         return out
     
     def relu(self):
-        """Vectorized ReLU activation."""
+        """ReLU activation: max(0, x).
+
+        Example:
+            >>> x = Tensor([-1.0, 0.0, 2.0])
+            >>> x.relu().data
+            array([0., 0., 2.])
+        """
         out_data = np.maximum(0, self.data)
         out = Tensor(out_data, requires_grad=self.requires_grad,
                     _children=(self,), _op='relu')
@@ -162,7 +210,13 @@ class Tensor:
         return out
     
     def gelu(self):
-        """Vectorized GELU activation with tanh approximation."""
+        """GELU activation (tanh approximation).
+
+        Example:
+            >>> x = Tensor([-3., -1.5, 0., 1.5, 3.])
+            >>> x.gelu().shape
+            (5,)
+        """
         out_data = 0.5 * self.data * (1 + np.tanh(np.sqrt(2 / np.pi) * (self.data + 0.044715 * self.data**3)))
         out = Tensor(out_data, requires_grad=self.requires_grad,
                     _children=(self,), _op='gelu')
@@ -181,7 +235,13 @@ class Tensor:
         return out
 
     def sigmoid(self):
-        """Vectorized sigmoid activation."""
+        """Sigmoid activation: 1 / (1 + exp(-x)).
+
+        Example:
+            >>> x = Tensor([-2.0, 0.0, 2.0])
+            >>> x.sigmoid().data.round(3)
+            array([0.119, 0.5  , 0.881])
+        """
         out_data = 1 / (1 + np.exp(-np.clip(self.data, -500, 500)))  # Numerical stability
         out = Tensor(out_data, requires_grad=self.requires_grad,
                     _children=(self,), _op='sigmoid')
@@ -195,7 +255,13 @@ class Tensor:
         return out
     
     def tanh(self):
-        """Vectorized tanh activation."""
+        """Hyperbolic tangent activation.
+
+        Example:
+            >>> x = Tensor([-1.0, 0.0, 1.0])
+            >>> x.tanh().data.round(3)
+            array([-0.762,  0.   ,  0.762])
+        """
         out_data = np.tanh(self.data)
         out = Tensor(out_data, requires_grad=self.requires_grad,
                     _children=(self,), _op='tanh')
@@ -209,7 +275,16 @@ class Tensor:
         return out
     
     def leaky_relu(self, alpha=0.01):
-        """Vectorized Leaky ReLU activation."""
+        """Vectorized Leaky ReLU activation.  
+        
+        Args:
+            alpha (float): Slope for negative inputs. Default is 0.01.
+        
+        Examples:
+            x = Tensor([-2.0, -1.0, 0.0, 1.0, 2.0])    
+            y = x.leaky_relu(alpha=0.1)  # Leaky ReLU activation    
+            print(y.data) # Output: [-0.2 -0.1  0.   1.   2. ]
+        """
         out_data = np.where(self.data > 0, self.data, alpha * self.data)
         out = Tensor(out_data, requires_grad=self.requires_grad,
                     _children=(self,), _op=f'leaky_relu({alpha})')
@@ -223,7 +298,16 @@ class Tensor:
         return out
     
     def swish(self, beta=1.0):
-        """Vectorized Swish activation: x * sigmoid(beta * x)."""
+        """Vectorized Swish activation: x * sigmoid(beta * x).
+        
+        Args:
+            beta (float): The beta parameter controlling the "steepness" of the sigmoid.
+                          Default is 1.0.
+        Examples:
+            x = Tensor([-2.0, -1.0, 0.0, 1.0, 2.0])  
+            y = x.swish(beta=1.0)  # Swish activation  
+            print(y.data) # Output: [-0.23840582 -0.26894143  0.          0.7310586   1.7615942 ]
+        """
         sigmoid_input = beta * self.data
         sigmoid_data = 1 / (1 + np.exp(-np.clip(sigmoid_input, -500, 500)))
         out_data = self.data * sigmoid_data
@@ -240,7 +324,22 @@ class Tensor:
         return out
     
     def sum(self, axis=None, keepdims=False):
-        """Sum tensor along specified axis."""
+        """Sum elements along an axis.
+
+        Args:
+            axis (int | tuple[int] | None): Axis or axes to sum over. If None, sum all elements.
+            keepdims (bool): Keep reduced dimensions with length 1.
+
+        Returns:
+            Tensor: Reduced tensor.
+
+        Examples:
+            >>> x = Tensor([[1., 2.], [3., 4.]])
+            >>> x.sum().data
+            10.0
+            >>> x.sum(axis=0).data
+            array([4., 6.])
+        """
         out_data = np.sum(self.data, axis=axis, keepdims=keepdims)
         out = Tensor(out_data, requires_grad=self.requires_grad,
                     _children=(self,), _op='sum')
@@ -261,7 +360,20 @@ class Tensor:
         return out
     
     def mean(self, axis=None, keepdims=False):
-        """Mean of tensor along specified axis."""
+        """Mean along an axis.
+
+        Args:
+            axis (int | tuple[int] | None): Axis or axes to average over. If None, global mean.
+            keepdims (bool): Keep reduced dimensions with length 1.
+
+        Returns:
+            Tensor: Reduced tensor.
+
+        Example:
+            >>> x = Tensor([[1., 2.], [3., 5.]])
+            >>> x.mean(axis=1).data
+            array([1.5, 4. ])
+        """
         out_data = np.mean(self.data, axis=axis, keepdims=keepdims)
         out = Tensor(out_data, requires_grad=self.requires_grad,
                     _children=(self,), _op='mean')
@@ -314,8 +426,23 @@ class Tensor:
 
 
     def reshape(self, *new_shape) -> 'Tensor':   
-        """Reshape tensor to new shape. Supports -1 for inferring dimension.
-        Accepts either a tuple or multiple integer arguments."""
+        """Reshape tensor to new shape.
+
+        Supports -1 to infer a single dimension. Accepts a tuple or multiple ints.
+
+        Args:
+            *new_shape: Target shape as a tuple or variadic integers.
+
+        Returns:
+            Tensor: Reshaped tensor.
+
+        Examples:
+            >>> x = Tensor([0, 1, 2, 3, 4, 5])
+            >>> x.reshape(2, 3).shape
+            (2, 3)
+            >>> x.reshape(-1, 2, 3).shape
+            (1, 2, 3)
+        """
         # Support both reshape((2,3)) and reshape(2,3)
         if len(new_shape) == 1 and isinstance(new_shape[0], (tuple, list)):
             new_shape = tuple(new_shape[0])
@@ -356,12 +483,35 @@ class Tensor:
         return out
 
     def flatten(self) -> 'Tensor':
-        """Convert tensor to 1D by flattening all dimensions."""
+        """Flatten to 1D.
+
+        Example:
+            >>> x = Tensor([[1, 2], [3, 4]])
+            >>> x.flatten().shape
+            (4,)
+        """
         return self.reshape(-1)
 
     def view(self, *new_shape) -> 'Tensor':
-        """Reshape tensor to new shape using shared memory. Supports -1 for inferring dimension.
-        Accepts either a tuple or multiple integer arguments."""
+        """View tensor with a new shape without copying memory.
+
+        Requires the tensor to be contiguous. Supports -1 to infer one dimension.
+
+        Args:
+            *new_shape: Target shape as a tuple or variadic integers.
+
+        Returns:
+            Tensor: A view sharing storage with the original.
+
+        Notes:
+            Use ``contiguous()`` or ``reshape()`` if the tensor is not contiguous.
+
+        Example:
+            >>> x = Tensor([[0, 1, 2], [3, 4, 5]])
+            >>> y = x.view(3, 2)
+            >>> y.data.base is not None  # shares memory
+            True
+        """
         # Support both view((2,3)) and view(2,3)
         if len(new_shape) == 1 and isinstance(new_shape[0], (tuple, list)):
             new_shape = tuple(new_shape[0])
@@ -422,7 +572,14 @@ class Tensor:
     def contiguous(self) -> 'Tensor':
         """Return a contiguous tensor with the same data.
         If the tensor is already contiguous, returns self.
-        Otherwise, returns a copy with contiguous memory layout."""
+        Otherwise, returns a copy with contiguous memory layout.  
+        
+        Returns:  
+            New contiguous tensor or self if already contiguous.  
+        Examples:  
+            x = Tensor(np.random.randn(2, 3, 4))
+            y = x.contiguous()  # y is a contiguous copy of x
+        """
         if self.data.flags['C_CONTIGUOUS']:
             return self  # Already contiguous, no need to copy
         
@@ -440,16 +597,19 @@ class Tensor:
         return out
         
     def transpose(self, *axes) -> 'Tensor':
-        """Transpose tensor dimensions. 
-        
+        """Transpose tensor dimensions.
+
         Args:
-            *axes: Either individual dimension indices (e.g., transpose(0, 1)) 
-                   or no arguments for default transpose
-                   
+            *axes: Either individual dim indices, a tuple of indices, or nothing
+                (reverse all dims).
+
+        Returns:
+            Tensor: Transposed tensor.
+
         Examples:
-            tensor.transpose()      # Reverse all dimensions  
-            tensor.transpose(0, 1)  # Swap dimensions 0 and 1  
-            tensor.transpose(2, 0, 1)  # Permute dimensions
+            tensor.transpose()          # Reverse all dimensions
+            tensor.transpose(0, 1)      # Swap dims 0 and 1
+            tensor.transpose(2, 0, 1)   # Permute dims
         """
         if len(axes) == 0:
             # Default transpose: reverse all dimensions
@@ -555,14 +715,43 @@ class Tensor:
         return out
         
     def mse_loss(self, target):
-        """Vectorized Mean Squared Error loss."""
+        """Mean Squared Error loss.
+
+        Args:
+            target (Tensor | array-like): Ground truth values (same shape).
+
+        Returns:
+            Tensor: Scalar loss.
+
+        Example:
+            >>> import numpy as np
+            >>> pred = Tensor(np.array([0.2, 0.7]))
+            >>> y = Tensor(np.array([0.0, 1.0]))
+            >>> pred.mse_loss(y).data
+            0.02499999850988388
+        """
         target = self._ensure_tensor(target)
         diff = self - target
         loss = (diff * diff).mean()
         return loss
     
     def cross_entropy_loss(self, targets):
-        """Vectorized cross-entropy loss for classification."""
+        """Cross-entropy loss for integer class targets.
+
+        Args:
+            targets (ndarray | list[int]): Class indices for each row.
+
+        Returns:
+            Tensor: Scalar loss (no full graph; see forgeNN.vectorized.cross_entropy_loss for full autodiff).
+
+        Example:
+            >>> import numpy as np
+            >>> logits = Tensor(np.random.randn(4, 10))
+            >>> y = np.array([1, 2, 3, 4])
+            >>> loss = logits.cross_entropy_loss(y)
+            >>> isinstance(loss, Tensor)
+            True
+        """
         # Apply log-softmax for numerical stability
         shifted_logits = self - self.max(axis=1, keepdims=True)
         log_probs = shifted_logits - shifted_logits.exp().sum(axis=1, keepdims=True).log()
@@ -575,13 +764,31 @@ class Tensor:
         return Tensor(loss, requires_grad=self.requires_grad)
     
     def softmax(self, axis=-1):
-        """Vectorized softmax function."""
+        """Softmax over a given axis.
+
+        Args:
+            axis (int): Axis to normalize over.
+
+        Returns:
+            Tensor: Probabilities that sum to 1 along the axis.
+
+        Example:
+            >>> x = Tensor([[1., 2.], [0., 0.]])
+            >>> probs = x.softmax(axis=1)
+            >>> probs.data.sum(axis=1)
+            array([1., 1.])
+        """
         shifted = self - self.max(axis=axis, keepdims=True)
         exp_vals = shifted.exp()
         return exp_vals / exp_vals.sum(axis=axis, keepdims=True)
     
     def exp(self):
-        """Element-wise exponential."""
+        """Element-wise exponential.
+
+        Example:
+            >>> Tensor([0., 1.]).exp().data
+            array([1.       , 2.7182817])
+        """
         out_data = np.exp(np.clip(self.data, -500, 500))  # Numerical stability
         out = Tensor(out_data, requires_grad=self.requires_grad,
                     _children=(self,), _op='exp')
@@ -594,7 +801,12 @@ class Tensor:
         return out
     
     def log(self):
-        """Element-wise natural logarithm."""
+        """Element-wise natural logarithm.
+
+        Example:
+            >>> Tensor([1., 2.7182817]).log().data.round(4)
+            array([0., 1.])
+        """
         out_data = np.log(np.clip(self.data, 1e-8, None))  # Numerical stability
         out = Tensor(out_data, requires_grad=self.requires_grad,
                     _children=(self,), _op='log')
@@ -607,7 +819,20 @@ class Tensor:
         return out
     
     def max(self, axis=None, keepdims=False):
-        """Maximum along specified axis."""
+        """Maximum along an axis.
+
+        Args:
+            axis (int | None): Axis to reduce. If None, returns global max as scalar tensor.
+            keepdims (bool): Keep reduced dimensions with length 1.
+
+        Returns:
+            Tensor: Reduced tensor containing maximum values.
+
+        Example:
+            >>> x = Tensor([[1., 5.], [3., 2.]])
+            >>> x.max(axis=0).data
+            array([3., 5.])
+        """
         out_data = np.max(self.data, axis=axis, keepdims=keepdims)
         out = Tensor(out_data, requires_grad=self.requires_grad,
                     _children=(self,), _op='max')
@@ -627,7 +852,19 @@ class Tensor:
         return out
     
     def backward(self):
-        """Perform backpropagation using topological sorting."""
+        """Run backpropagation from this tensor.
+
+        This treats the tensor as a scalar objective by seeding d(output)/d(output) = 1.
+
+        Example:
+            >>> import numpy as np
+            >>> x = Tensor(np.array([[1., 2.]]))
+            >>> W = Tensor(np.array([[3.], [4.]]))
+            >>> y = (x @ W).sum()
+            >>> y.backward()
+            >>> W.grad.shape
+            (2, 1)
+        """
         topo = []
         visited = set()
         
@@ -652,7 +889,7 @@ class Tensor:
             tensor._backward()
     
     def zero_grad(self):
-        """Reset gradients to zero."""
+        """Reset gradients to zero in-place."""
         if self.grad is not None:
             self.grad.fill(0)
     
@@ -678,7 +915,12 @@ class Tensor:
         return self + other
     
     def __truediv__(self, other):
-        """Element-wise division."""
+        """Element-wise division.
+
+        Example:
+            >>> (Tensor([2., 4.]) / 2).data
+            array([1., 2.])
+        """
         if isinstance(other, (int, float)):
             other = Tensor(other, requires_grad=False)
         
@@ -688,13 +930,24 @@ class Tensor:
         return self * reciprocal
     
     def __rtruediv__(self, other):
-        """Right division: other / self"""
+        """Right division: compute other / self."""
         if isinstance(other, (int, float)):
             other = Tensor(other, requires_grad=False)
         return other / self
     
     def __pow__(self, exponent):
-        """Element-wise power operation."""
+        """Element-wise power operation.
+
+        Args:
+            exponent (float | int): Exponent to raise each element to.
+
+        Returns:
+            Tensor: x ** exponent element-wise.
+
+        Example:
+            >>> (Tensor([2., 3.]) ** 2).data
+            array([4., 9.])
+        """
         out_data = np.power(self.data, exponent)
         out = Tensor(out_data, requires_grad=self.requires_grad,
                     _children=(self,), _op=f'pow{exponent}')

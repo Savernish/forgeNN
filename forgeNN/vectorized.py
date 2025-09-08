@@ -98,7 +98,20 @@ class VectorizedLayer:
         self.activation = activation
     
     def __call__(self, x: Tensor) -> Tensor:
-        """Forward pass through the layer."""
+        """Forward pass through the layer.
+
+        Args:
+            x (Tensor): Input of shape (batch_size, input_size).
+
+        Returns:
+            Tensor: Output of shape (batch_size, output_size).
+
+        Example:
+            >>> layer = VectorizedLayer(4, 3, 'relu')
+            >>> out = layer(Tensor([[1., 2., 3., 4.], [5., 6., 7., 8.]]))
+            >>> out.shape
+            (2, 3)
+        """
         # Linear transformation: x @ W + b
         output = x @ self.weights + self.bias
         
@@ -106,7 +119,11 @@ class VectorizedLayer:
         return self._apply_activation(output)
     
     def _apply_activation(self, x: Tensor) -> Tensor:
-        """Apply activation function in a unified way."""
+        """Apply activation function in a unified way.
+
+        Supports strings (e.g., 'relu'), activation classes (RELU, etc.),
+        instances with .forward(x), or callables.
+        """
         if callable(self.activation) and not isinstance(self.activation, type):
             # Direct callable (lambda, function) or activation class instance
             if hasattr(self.activation, 'forward'):
@@ -200,21 +217,44 @@ class VectorizedMLP:
             self.layers.append(layer)
     
     def __call__(self, x: Tensor) -> Tensor:
-        """Forward pass through the entire network."""
+        """Forward pass through the entire network.
+
+        Args:
+            x (Tensor): Input of shape (batch_size, input_size).
+
+        Returns:
+            Tensor: Output logits of shape (batch_size, output_size).
+
+        Example:
+            >>> model = VectorizedMLP(8, [16], 4, ['relu', 'linear'])
+            >>> model(Tensor([[1]*8, [2]*8])).shape
+            (2, 4)
+        """
         output = x
         for layer in self.layers:
             output = layer(output)
         return output
     
     def parameters(self) -> List[Tensor]:
-        """Return all trainable parameters from all layers."""
+        """Return all trainable parameters from all layers.
+
+        Returns:
+            list[Tensor]: Weights and biases for each layer.
+        """
         params = []
         for layer in self.layers:
             params.extend(layer.parameters())
         return params
     
     def zero_grad(self):
-        """Reset gradients for all parameters."""
+        """Reset gradients for all parameters.
+
+        Example:
+            >>> model = VectorizedMLP(4, [3], 2, ['relu', 'linear'])
+            >>> x = Tensor([[1., 2., 3., 4.], [5., 6., 7., 8.]])
+            >>> y = model(x).sum(); y.backward()
+            >>> model.zero_grad()  # clears in-place
+        """
         for param in self.parameters():
             param.zero_grad()
 
@@ -254,7 +294,10 @@ class VectorizedOptimizer:
             self.momentum_buffers = None
     
     def step(self):
-        """Perform one optimization step."""
+        """Perform one optimization step.
+
+        Applies SGD update with optional momentum.
+        """
         for i, param in enumerate(self.parameters):
             if param.grad is None:
                 continue
@@ -272,9 +315,52 @@ class VectorizedOptimizer:
             param.data -= self.lr * update
     
     def zero_grad(self):
-        """Reset gradients for all parameters."""
+        """Reset gradients for all parameters.
+
+        Example:
+            >>> import numpy as np
+            >>> from forgeNN.tensor import Tensor
+            >>> model = VectorizedMLP(3, [5], 2)
+            >>> opt = VectorizedOptimizer(model.parameters(), lr=0.1)
+            >>> Tensor(np.random.randn(4, 3))  # simulate usage
+            array([...])
+        """
         for param in self.parameters:
             param.zero_grad()
+
+def mse(logits: Tensor, targets: Union[np.ndarray, Tensor]) -> Tensor:
+    """
+    Compute Mean Squared Error (MSE) loss.
+
+    This returns the mean over all elements, i.e., mean((logits - targets)^2).
+    Gradients are handled by the existing Tensor operations, ensuring
+    correct scaling over batch and feature dimensions and supporting broadcasting.
+    
+    Args:
+        logits (Tensor): Predictions of shape (N, D, ...)
+        targets (ndarray | Tensor): Targets broadcastable to logits' shape
+        
+    Returns:
+        Tensor: Scalar loss value connected to logits for backprop.
+
+    Example:
+        >>> preds = Tensor([[0.5, 0.2], [0.1, 0.4]])
+        >>> y = np.array([[1.0, 0.0], [0.0, 1.0]])
+        >>> loss = mse(preds, y)
+        >>> loss.backward()
+        >>> preds.grad.shape
+        (2, 2)
+    """
+    t = targets if isinstance(targets, Tensor) else Tensor(np.asarray(targets), requires_grad=False)
+    # Gracefully handle common binary/regression case where logits are (N,1)
+    # but targets are (N,). Avoid unintended (N,N) broadcasting.
+    if isinstance(t, Tensor):
+        if t.data.ndim == 1 and logits.data.ndim >= 2:
+            # If all non-batch dims of logits are singleton, reshape targets to match
+            if all(d == 1 for d in logits.data.shape[1:]):
+                t = Tensor(t.data.reshape((t.data.shape[0],) + logits.data.shape[1:]), requires_grad=False)
+    diff = logits - t
+    return (diff * diff).mean()
 
 def cross_entropy_loss(logits: Tensor, targets: np.ndarray) -> Tensor:
     """
@@ -285,7 +371,15 @@ def cross_entropy_loss(logits: Tensor, targets: np.ndarray) -> Tensor:
         targets (np.ndarray): Class indices (batch_size,)
         
     Returns:
-        Tensor: Scalar loss value
+        Tensor: Scalar loss value connected to logits for backprop.
+
+    Example:
+        >>> logits = Tensor([[1., 0.5], [0.2, 0.8]])
+        >>> y = np.array([0, 1])
+        >>> loss = cross_entropy_loss(logits, y)
+        >>> loss.backward()
+        >>> logits.grad.shape
+        (2, 2)
     """
     batch_size = logits.data.shape[0]
     
@@ -332,6 +426,23 @@ def accuracy(logits: Tensor, targets: np.ndarray) -> float:
         
     Returns:
         float: Accuracy as fraction between 0 and 1
+
+    Example:
+        >>> logits = Tensor([[1.0, 3.0], [2.0, 0.1]])
+        >>> targets = np.array([1, 0])
+        >>> round(accuracy(logits, targets), 2)
+        1.0
     """
     predictions = np.argmax(logits.data, axis=1)
     return np.mean(predictions == targets)
+
+def accuracy_counts(logits: Tensor, targets: np.ndarray) -> tuple[int, int]:
+    """Return (correct, total) for exact aggregation over dataset.
+
+    This helper is not used by default APIs but can be used where
+    tighter aggregation is needed.
+    """
+    predictions = np.argmax(logits.data, axis=1)
+    correct = int(np.sum(predictions == targets))
+    total = int(len(targets))
+    return correct, total

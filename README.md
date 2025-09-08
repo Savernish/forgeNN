@@ -83,6 +83,26 @@ for epoch in range(10):
     print(f"Epoch {epoch}: Loss = {loss.data:.4f}, Acc = {acc*100:.1f}%")
 ```
 
+### Keras-like Training (compile/fit)
+
+```python
+import forgeNN as fnn
+
+model = fnn.Sequential([
+   fnn.Dense(64) @ 'relu',
+   fnn.Dense(32) @ 'relu',
+   fnn.Dense(3)  @ 'linear'
+])
+
+# Initialize lazy params if needed
+_ = model(fnn.Tensor([[0.0]*20]))
+
+compiled = fnn.compile(model, optimizer={"lr": 0.01, "momentum": 0.9},
+                  loss='cross_entropy', metrics=['accuracy'])
+compiled.fit(X, y, epochs=10, batch_size=64)
+loss, metrics = compiled.evaluate(X, y)
+```
+
 ## Architecture
 
 - **Main API**: `forgeNN.Tensor`, `forgeNN.VectorizedMLP` (high-performance neural networks)
@@ -108,6 +128,7 @@ See `example.py` for a full MNIST classification demo achieving professional res
 
 - **PyPI Package**: https://pypi.org/project/forgeNN/
 - **Documentation**: See guides in this repository
+- **Guides**: SEQUENTIAL_GUIDE.md, TRAINING_GUIDE.md, COMPARISON_GUIDE.md
 - **Issues**: GitHub Issues for bug reports and feature requests
 
 ## TODO List
