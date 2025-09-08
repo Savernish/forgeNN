@@ -336,9 +336,13 @@ def mse(logits: Tensor, targets: Union[np.ndarray, Tensor]) -> Tensor:
     Gradients are handled by the existing Tensor operations, ensuring
     correct scaling over batch and feature dimensions and supporting broadcasting.
     
-    Args:
-        logits (Tensor): Predictions of shape (N, D, ...)
-        targets (ndarray | Tensor): Targets broadcastable to logits' shape
+        Args:
+                logits (Tensor): Predictions of shape (N, D, ...)
+                targets (ndarray | Tensor):
+                        - If same shape as logits (or broadcastable), used directly.
+                        - If 1D integer class indices and logits has shape (N, C) with C>1,
+                            targets are automatically one-hot encoded to (N, C).
+                        - If 1D floating values and logits has shape (N, 1) they are reshaped to (N,1).
         
     Returns:
         Tensor: Scalar loss value connected to logits for backprop.
@@ -352,13 +356,21 @@ def mse(logits: Tensor, targets: Union[np.ndarray, Tensor]) -> Tensor:
         (2, 2)
     """
     t = targets if isinstance(targets, Tensor) else Tensor(np.asarray(targets), requires_grad=False)
-    # Gracefully handle common binary/regression case where logits are (N,1)
-    # but targets are (N,). Avoid unintended (N,N) broadcasting.
-    if isinstance(t, Tensor):
-        if t.data.ndim == 1 and logits.data.ndim >= 2:
-            # If all non-batch dims of logits are singleton, reshape targets to match
-            if all(d == 1 for d in logits.data.shape[1:]):
-                t = Tensor(t.data.reshape((t.data.shape[0],) + logits.data.shape[1:]), requires_grad=False)
+
+    if isinstance(t, Tensor) and t.data.ndim == 1 and logits.data.ndim >= 2:
+        batch = logits.data.shape[0]
+        # Case A: binary/regression logits with singleton non-batch dims (N,1,...)
+        if all(d == 1 for d in logits.data.shape[1:]):
+            t = Tensor(t.data.reshape((batch,) + logits.data.shape[1:]), requires_grad=False)
+        # Case B: multi-class classification logits (N,C) and integer class labels
+        elif len(logits.data.shape) == 2:
+            C = logits.data.shape[1]
+            # Heuristic: if targets look like class indices (integers within [0, C)) -> one-hot
+            labels = t.data.astype(int)
+            if labels.min() >= 0 and labels.max() < C:
+                one_hot = np.zeros((batch, C), dtype=logits.data.dtype)
+                one_hot[np.arange(batch), labels] = 1.0
+                t = Tensor(one_hot, requires_grad=False)
     diff = logits - t
     return (diff * diff).mean()
 
