@@ -38,16 +38,16 @@ Example:
 # Main vectorized API
 from .tensor import Tensor
 from .vectorized import VectorizedMLP, VectorizedOptimizer, cross_entropy_loss, accuracy
-from .layers import Layer, ActivationWrapper, Sequential, Dense, Flatten, Conv2D, MaxPool2D
+from .layers import Layer, ActivationWrapper, Sequential, Dense, Flatten, Conv2D, MaxPool2D, Input
 from .training import compile
 
 # Activation functions for advanced usage
 from .functions.activation import RELU, LRELU, TANH, SIGMOID, SWISH
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 __all__ = [
     'Tensor', 'VectorizedMLP', 'VectorizedOptimizer', 'cross_entropy_loss', 'accuracy',
     'RELU', 'LRELU', 'TANH', 'SIGMOID', 'SWISH',
-    'Layer', 'ActivationWrapper', 'Sequential', 'Dense', 'Flatten', 'Conv2D', 'MaxPool2D',
+    'Layer', 'ActivationWrapper', 'Sequential', 'Dense', 'Flatten', 'Conv2D', 'MaxPool2D', 'Input',
     'compile'
 ]

@@ -18,7 +18,7 @@ Notes:
     - Parameters are collected from all layers to work with VectorizedOptimizer.
 """
 
-from typing import Callable, Iterable, List, Optional, Sequence, Union
+from typing import Callable, Iterable, List, Optional, Sequence, Union, Tuple
 
 from .tensor import Tensor
 from .vectorized import ACTIVATION_FUNCTIONS  # Reuse unified activation mapping
@@ -172,6 +172,11 @@ class Sequential(Layer):
 
     def __init__(self, layers: Sequence[Layer]):
         self.layers: List[Layer] = list(layers)
+        if not self.layers:
+            raise ValueError("Sequential requires at least one layer")
+        # Building is now *symbolic / optional*. Real params for Dense can still be lazily
+        # initialized at first forward. We keep a flag if we have attempted a symbolic build.
+        self._built_symbolic = False
 
     def forward(self, x: Tensor) -> Tensor:
         """Apply layers in order to input ``x``.
@@ -199,6 +204,234 @@ class Sequential(Layer):
         for p in self.parameters():
             p.zero_grad()
 
+    def _build(self) -> None:
+        """Symbolically build the network by initializing layer parameters.
+
+        Uses the shape information from the Input layer to initialize Dense layers
+        that were defined without explicit in_features. No lazy initialization will
+        occur later; Dense layers must be ready after construction.
+        """
+        input_layer = self.layers[0]
+        assert isinstance(input_layer, Input)
+        current_shape = (None,) + tuple(input_layer.shape)
+        for layer in self.layers[1:]:
+            # Unwrap activation wrapper for shape / init handling
+            target = layer.layer if isinstance(layer, ActivationWrapper) else layer
+            if isinstance(target, Flatten):
+                if len(current_shape) > 2:
+                    prod = 1
+                    for d in current_shape[1:]:
+                        prod *= d
+                    current_shape = (None, prod)
+                # else unchanged
+            elif isinstance(target, Dense):
+                if target.W is None:
+                    # Determine in_features from current_shape
+                    if len(current_shape) == 2 and current_shape[1] is not None:
+                        in_feats = current_shape[1]
+                    else:
+                        # Flatten implicit multi-d input
+                        prod = 1
+                        for d in current_shape[1:]:
+                            prod *= d
+                        in_feats = prod
+                    target._init_params(in_feats)
+                current_shape = (None, target.out_features)
+            # Other layer types (conv/pool) not implemented: keep shape conservative
+        self._built = True
+
+        def summary(self, input_shape: Optional[Sequence[int]] = None) -> None:
+                """Print a Keras-like model summary.
+
+                Behavior:
+                        - If an Input layer is present (anywhere, typically first), its declared
+                            shape seeds symbolic shape propagation.
+                        - If ``input_shape`` argument is provided it overrides and seeds
+                            propagation (batch dim implicit as None).
+                        - Dense layers with known input feature size (either via existing
+                            weights or explicit ``in_features`` or inferred current shape) will
+                            show concrete output shapes and parameter counts.
+                        - Dense layers without resolvable input size remain *unbuilt* until
+                            first real forward; they display output shape='?' and Param#=0.
+                        - Flatten collapses known trailing dimensions when they are all
+                            concrete; otherwise outputs '(None, ?)' until resolvable.
+
+                Args:
+                        input_shape: Optional tuple excluding batch dimension to seed shape
+                                inference when no Input layer exists.
+                """
+                # Column widths
+                col_layer = 30
+                col_shape = 28
+                header_line = "=" * (col_layer + col_shape + 11)
+                print(header_line)
+                print(f"{'Layer (type)':<{col_layer}}{'Output Shape':<{col_shape}}Param #")
+                print(header_line)
+
+                # Seed shape: from explicit arg or first Input layer
+                current_shape: Optional[Tuple[Optional[int], ...]] = None
+                if input_shape is not None:
+                        current_shape = (None,) + tuple(input_shape)
+                else:
+                        for lyr in self.layers:
+                                if isinstance(lyr, Input):
+                                        current_shape = (None,) + tuple(lyr.shape)
+                                        break
+
+                total_params = 0
+                total_tensors = 0
+
+                for layer in self.layers:
+                        display_name = self._format_layer_name(layer)
+
+                        # Unwrap for logic but keep wrapper display
+                        core = layer.layer if isinstance(layer, ActivationWrapper) else layer
+                        out_shape_str = '?'
+
+                        # Symbolic inference if we have current shape
+                        if current_shape is not None:
+                                inferred = self._infer_next_shape_symbolic(core, current_shape)
+                                if inferred is not None:
+                                        current_shape = inferred
+                                        out_shape_str = str(current_shape)
+                        else:
+                                # If layer itself provides a static output (Input)
+                                if isinstance(core, Input):
+                                        current_shape = (None,) + tuple(core.shape)
+                                        out_shape_str = str(current_shape)
+
+                        # Parameter computation (may conditionally initialize Dense if resolvable)
+                        if isinstance(core, Dense) and core.W is None and current_shape is not None:
+                                # Try build only if last dim known
+                                if len(current_shape) == 2 and current_shape[1] is not None:
+                                        core._init_params(current_shape[1])
+                                        # Refresh out shape
+                                        current_shape = (None, core.out_features)
+                                        out_shape_str = str(current_shape)
+
+                        p = layer.num_parameters()
+                        t = layer.num_parameter_tensors()
+                        total_params += p
+                        total_tensors += t
+
+                        print(f"{display_name:<{col_layer}}{out_shape_str:<{col_shape}}{p:>7}")
+
+                print(header_line)
+                print(f"Total params: {total_params}")
+                print(f"Total parameter tensors: {total_tensors}")
+                print(header_line)
+
+    def _format_layer_name(self, layer: Layer) -> str:
+        """Return a concise layer display name including activation if wrapped."""
+        if isinstance(layer, ActivationWrapper):
+            # Show underlying and activation
+            act = layer.activation
+            if callable(act) and not isinstance(act, type):
+                act_name = getattr(act, '__name__', act.__class__.__name__)
+            elif isinstance(act, type):
+                act_name = act.__name__
+            else:
+                act_name = str(act)
+            base_name = layer.layer.__class__.__name__
+            return f"{base_name}({act_name})"
+        return layer.__class__.__name__
+
+    def _safe_layer_output_shape(self, layer: Layer) -> str:  # kept for backward compat
+        if isinstance(layer, Input):
+            return str((None,)+tuple(layer.shape))
+        if isinstance(layer, Dense) and getattr(layer, 'W', None) is not None:
+            return str((None, layer.W.data.shape[1]))
+        if isinstance(layer, Flatten):
+            return '(None, ? )'
+        if isinstance(layer, ActivationWrapper):
+            return self._safe_layer_output_shape(layer.layer)
+        return '?'
+
+    def _infer_next_shape_symbolic(self, core: Layer, in_shape: tuple) -> Optional[tuple]:
+        if isinstance(core, Input):
+            return (None,)+tuple(core.shape)
+        if isinstance(core, Flatten):
+            if len(in_shape) <= 2:
+                return in_shape
+            prod = 1
+            for d in in_shape[1:]:
+                if d is None:
+                    return (None, None)
+                prod *= d
+            return (None, prod)
+        if isinstance(core, Dense):
+            # Already built
+            if core.W is not None:
+                return (None, core.W.data.shape[1])
+            # If explicit in_features known
+            if core.in_features is not None:
+                core._init_params(core.in_features)
+                return (None, core.out_features)
+            # Infer from incoming shape if 2D
+            if len(in_shape) == 2 and in_shape[1] is not None:
+                core._init_params(in_shape[1])
+                return (None, core.out_features)
+            return None
+        # For activation wrappers handled outside, for others unknown
+        return in_shape if isinstance(core, ActivationWrapper) else None
+
+    # Added (or re-added) summary method: ensure it's defined at class scope
+    def summary(self, input_shape: Optional[Sequence[int]] = None) -> None:
+        """Print a Keras-like model summary.
+
+        Args:
+            input_shape: Optional shape (excluding batch) to seed inference if no Input layer.
+        """
+        col_layer = 30
+        col_shape = 28
+        header_line = "=" * (col_layer + col_shape + 11)
+        print(header_line)
+        print(f"{'Layer (type)':<{col_layer}}{'Output Shape':<{col_shape}}Param #")
+        print(header_line)
+
+        current_shape: Optional[Tuple[Optional[int], ...]] = None
+        if input_shape is not None:
+            current_shape = (None,) + tuple(input_shape)
+        else:
+            for lyr in self.layers:
+                core = lyr.layer if isinstance(lyr, ActivationWrapper) else lyr
+                if isinstance(core, Input):
+                    current_shape = (None,) + tuple(core.shape)
+                    break
+
+        total_params = 0
+        total_tensors = 0
+        for layer in self.layers:
+            name = self._format_layer_name(layer)
+            core = layer.layer if isinstance(layer, ActivationWrapper) else layer
+            shape_str = '?'
+
+            if current_shape is not None:
+                inferred = self._infer_next_shape_symbolic(core, current_shape)
+                if inferred is not None:
+                    current_shape = inferred
+                    shape_str = str(current_shape)
+            elif isinstance(core, Input):
+                current_shape = (None,) + tuple(core.shape)
+                shape_str = str(current_shape)
+
+            if isinstance(core, Dense) and core.W is None and current_shape is not None:
+                if len(current_shape) == 2 and current_shape[1] is not None:
+                    core._init_params(current_shape[1])
+                    current_shape = (None, core.out_features)
+                    shape_str = str(current_shape)
+
+            p = layer.num_parameters()
+            t = layer.num_parameter_tensors()
+            total_params += p
+            total_tensors += t
+            print(f"{name:<{col_layer}}{shape_str:<{col_shape}}{p:>7}")
+
+        print(header_line)
+        print(f"Total params: {total_params}")
+        print(f"Total parameter tensors: {total_tensors}")
+        print(header_line)
+
 
 class Dense(Layer):
     """Fully-connected (linear) layer with optional lazy initialization.
@@ -220,7 +453,7 @@ class Dense(Layer):
         self.out_features = out_features
         self.W: Optional[Tensor] = None
         self.b: Optional[Tensor] = None
-
+        # Do not rely on lazy init at forward; will be initialized during Sequential build
         if in_features is not None:
             self._init_params(in_features)
 
@@ -236,13 +469,8 @@ class Dense(Layer):
         self.b = Tensor([0.0] * self.out_features, requires_grad=True)
 
     def forward(self, x: Tensor) -> Tensor:
-        """Compute ``x @ W + b`` with lazy parameter initialization.
-
-        If ``in_features`` was omitted, the first call infers it from
-        ``x.shape[-1]`` and initializes parameters accordingly.
-        """
+        """Compute ``x @ W + b`` with lazy initialization if needed."""
         if self.W is None or self.b is None:
-            # Infer on first use; assume shape (N, D)
             self._init_params(x.shape[-1])
         return x @ self.W + self.b
 
@@ -311,7 +539,35 @@ class MaxPool2D(Layer):  # pragma: no cover - placeholder
         self.pool_size = pool_size
 
     def forward(self, x: Tensor) -> Tensor:
+        """Apply the max pooling operation. """
         raise NotImplementedError("MaxPool2D forward is not implemented yet.")
 
     def parameters(self) -> List[Tensor]:
+        return []
+
+
+class Input(Layer):
+    """Input placeholder layer defining the expected input shape (excluding batch).
+
+    Example:
+        >>> model = Sequential([
+        ...     Input((784,)),
+        ...     Dense(128) @ 'relu',
+        ...     Dense(10)
+        ... ])
+    """
+
+    def __init__(self, shape: Tuple[int, ...]):
+        if not isinstance(shape, (tuple, list)) or not shape:
+            raise ValueError("Input shape must be a non-empty tuple/list of dimensions")
+        self.shape = tuple(int(d) for d in shape)
+
+    def forward(self, x: Tensor) -> Tensor:
+        # Optionally validate trailing shape lengths if feasible
+        if len(x.shape) - 1 != len(self.shape):
+            # Allow mismatch silently (user may feed different rank); skip strictness
+            return x
+        return x
+
+    def parameters(self) -> List[Tensor]:  # no params
         return []

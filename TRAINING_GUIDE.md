@@ -9,13 +9,16 @@ import forgeNN as fnn
 
 # Define model
 model = fnn.Sequential([
+    fnn.Input((784,)),        # optional: seeds summary/inference
     fnn.Dense(128) @ 'relu',
     fnn.Dense(64)  @ 'relu',
     fnn.Dense(10)  @ 'linear',  # logits
 ])
 
-# Initialize lazy parameters (if using Dense without in_features)
-_ = model(fnn.Tensor([[0.0]*784]))
+# Initialization options (any one works):
+# 1. Include an Input layer (already done)
+# 2. Call model.summary() or model.summary((784,)) to force symbolic build
+# 3. Run a dummy forward: _ = model(fnn.Tensor([[0.0]*784]))
 
 # Compile with optimizer config, loss, metrics
 compiled = fnn.compile(
@@ -66,10 +69,18 @@ If you prefer explicit loops, you can still create VectorizedOptimizer and write
 
 ## Tips for Lazy Initialization
 
-If a layer (like Dense) infers input size on the first forward, ensure parameters are created before compiling:
+If a layer (like Dense) infers input size on the first forward, ensure parameters are created before compiling by either:
 
 ```python
+# Option A: Provide Input layer upfront
+model = fnn.Sequential([fnn.Input((input_dim,)), fnn.Dense(32) @ 'relu', fnn.Dense(10)])
+
+# Option B: Call summary with shape
+model.summary((input_dim,))
+
+# Option C: Dummy forward
 _ = model(fnn.Tensor(np.zeros((1, input_dim), dtype=np.float32)))
+
 compiled = fnn.compile(model, optimizer={"lr": 0.01})
 ```
 

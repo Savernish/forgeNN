@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2025-09-09
+
+### Added
+- Keras-like `Sequential.summary()` method with symbolic shape inference:
+  - Displays layer type (including attached activation), inferred output shape, and parameter counts
+  - Automatically initializes lazily defined `Dense` layers when input feature size can be inferred
+  - Supports optional `Input` layer to seed shape propagation or an explicit `input_shape` argument
+- New `Input` layer (shape placeholder) exported at top level; integrates with summary and symbolic inference
+- Auto one-hot + regression reshaping logic in `mse` improved (classification targets converted when 1D indices and logits are 2D)
+
+### Changed
+- Restored lazy initialization semantics for `Dense` during forward, while allowing summary to perform safe symbolic initialization when shapes are fully known
+- Summary now keeps unresolvable shapes as `?` instead of forcing initialization (safer for partially dynamic pipelines)
+- Documentation (guides) updated to reflect `Input` layer usage and model introspection via `model.summary()`
+
+### Fixed
+- Resolved missing `Sequential.summary` attribute caused by earlier nested definition bug
+- Ensured parameter counts include activation-wrapped layers consistently
+
+### Notes
+- No breaking API changes; existing models continue to work
+- `Input` layer is optional—models without it still summarize if `input_shape` is passed or shapes become inferable after first forward
+
+### Upcoming (Planned)
+- Potential inclusion of concatenation (`cat`) and stacking utilities per TODO roadmap
+- Extended summary statistics (dtype, trainable flags) in future minor release
+
+
 ## [1.2.0] - 2025-09-08
 
 ### Added

@@ -24,6 +24,7 @@ import forgeNN as fnn
 
 # Build a simple MLP: 4 -> 8 -> 2
 model = fnn.Sequential([
+    fnn.Input((4,)),         # optional: seeds symbolic shape inference & summary
     fnn.Dense(8) @ 'relu',   # attach ReLU via @ operator
     fnn.Dense(2) @ 'linear'
 ])
@@ -41,7 +42,34 @@ loss.backward()
 opt.step()
 ```
 
-Tip on lazy initialization: Dense infers in_features on first forward. If you create your optimizer before the first forward, either pass in_features explicitly (Dense(out, in_features=...)) or run a single dummy forward to initialize parameters.
+Tip on lazy initialization: `Dense` still infers `in_features` on the first real forward if not explicitly provided. The new `model.summary()` will proactively initialize a `Dense` layer only when the incoming feature dimension is unambiguously known (e.g., via an `Input` layer or previously inferred shape). If you build an optimizer before the first forward and did not call `model.summary()`, either:
+1. Provide `in_features` explicitly, or
+2. Run a dummy forward, or
+3. Call `model.summary(input_shape=(...))` to initialize shapes.
+
+### Model Introspection
+
+You can now inspect architecture details with a Keras-like summary:
+
+```python
+model.summary()            # uses Input layer if present
+model.summary((4,))        # or pass input shape explicitly (excluding batch)
+```
+
+Output example:
+
+```
+============================================================
+Layer (type)                  Output Shape                Param #
+============================================================
+Input                         (None, 4)                         0
+Dense(relu)                   (None, 8)                        40
+Dense(linear)                 (None, 2)                        18
+============================================================
+Total params: 58
+Total parameter tensors: 4
+============================================================
+```
 
 ## Syntax Comparison: PyTorch vs TensorFlow/Keras vs forgeNN
 
@@ -52,14 +80,17 @@ PyTorch
 import torch
 import torch.nn as nn
 
-model = nn.Sequential(
-    nn.Linear(784, 128), nn.ReLU(),
-    nn.Linear(128, 64),  nn.ReLU(),
-    nn.Linear(64, 10)    # logits
-)
-```
+model = fnn.Sequential([
+    fnn.Input((784,)),             # optional but enables immediate shape inference
+    fnn.Dense(128) @ 'relu',
+    fnn.Dense(64)  @ 'relu',
+    fnn.Dense(10)  @ 'linear'  # logits
+])
 
-TensorFlow/Keras
+# Initialization options (choose one):
+# 1. Provide Input layer (already done) -> shapes known
+# 2. Or run: _ = model(fnn.Tensor([[0.0]*784]))
+# 3. Or: model.summary((784,))
 ```python
 import tensorflow as tf
 
@@ -204,7 +235,7 @@ PyTorch users can skip writing the manual loop by using `compiled.fit`.
 ## Design Notes
 
 - Activation attachment with @ is explicit and local: you see which activation follows a particular layer
-- Lazy initialization in Dense keeps constructor minimal for readability; specify in_features to disable laziness
+- Lazy initialization in Dense keeps constructor minimal for readability; specify in_features to disable laziness or use an Input layer/summary to pre-build
 - Sequential.parameters() returns trainable tensors ready for VectorizedOptimizer
 - Works seamlessly with Tensor’s autodiff operations implemented in forgeNN
 

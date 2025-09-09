@@ -14,6 +14,7 @@
 - [Acknowledgments](#Acknowledgments)
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Stars](https://img.shields.io/github/stars/Savernish/forgeNN.svg?style=social&label=Stars)](https://github.com/Savernish/forgeNN)
 [![NumPy](https://img.shields.io/badge/powered_by-NumPy-blue.svg)](https://numpy.org/)
 [![PyPI version](https://img.shields.io/pypi/v/forgeNN.svg)](https://pypi.org/project/forgeNN/)
 [![Downloads](https://img.shields.io/pypi/dm/forgeNN.svg)](https://pypi.org/project/forgeNN/)
@@ -48,7 +49,6 @@ pip install forgeNN
 
 📊 **[See Full Comparison Guide](COMPARISON_GUIDE.md)** for detailed benchmarks, syntax differences, and when to use each framework.
 
-![MNIST Benchmark Results](mnist_benchmark_comparison.png)
 
 ## Quick Start
 
@@ -89,13 +89,14 @@ for epoch in range(10):
 import forgeNN as fnn
 
 model = fnn.Sequential([
-   fnn.Dense(64) @ 'relu',
-   fnn.Dense(32) @ 'relu',
-   fnn.Dense(3)  @ 'linear'
+    fnn.Input((20,)),        # optional Input layer seeds summary & shapes
+    fnn.Dense(64) @ 'relu',
+    fnn.Dense(32) @ 'relu',
+    fnn.Dense(3)  @ 'linear'
 ])
 
-# Initialize lazy params if needed
-_ = model(fnn.Tensor([[0.0]*20]))
+# Optionally inspect architecture
+model.summary()              # or model.summary((20,)) if no Input layer
 
 compiled = fnn.compile(model, optimizer={"lr": 0.01, "momentum": 0.9},
                   loss='cross_entropy', metrics=['accuracy'])
@@ -105,14 +106,15 @@ loss, metrics = compiled.evaluate(X, y)
 
 ## Architecture
 
-- **Main API**: `forgeNN`, `forgeNN.Tensor`, `forgeNN.VectorizedMLP`
+- **Main API**: `forgeNN`, `forgeNN.Tensor`, `forgeNN.Sequential`, `forgeNN.Input`, `forgeNN.VectorizedMLP`
 - **Examples**: Check `examples/` for MNIST and more
 
 ## Performance
 
 | Implementation | Speed | MNIST Accuracy |
 |---------------|-------|----------------|
-| Vectorized | 38,000+ samples/sec | 93%+ in <2s |
+| Vectorized | 40,000+ samples/sec | 95%+ in <1s |
+| Sequential (with compile/fit) | 40,000+ samples/sec | 95%+ in <1.2s |
 
 **Highlights**:
 - **100x+ speedup** over scalar implementations

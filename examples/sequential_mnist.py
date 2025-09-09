@@ -63,15 +63,16 @@ def main():
     # Model (lazy-init Dense; run a dummy forward before compiling)
     print("\nBuilding Sequential model...")
     model = fnn.Sequential([
+        fnn.Input((784,)),
         fnn.Dense(128) @ 'relu',
         fnn.Dense(64) @ 'relu',
         fnn.Dense(10) @ 'linear',  # logits
     ])
 
-    # Initialize lazily constructed params for all layers
-    _ = model(fnn.Tensor(np.zeros((1, 784), dtype=np.float32)))
-
-    print(f"Total parameters: {model.num_parameters():,}")
+    # # Initialize lazily constructed params for all layers
+    # _ = model(fnn.Tensor(np.zeros((1, 784), dtype=np.float32)))
+    model.summary()
+    time.sleep(4)
 
     # Compile with built-in loss/metric and optimizer config
     compiled = fnn.compile(
