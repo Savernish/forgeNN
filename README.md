@@ -47,7 +47,7 @@ pip install forgeNN
 | Test Accuracy | 97.30% | 97.37% | **+0.07% better** |
 | Small Models (<109k params) | Baseline | **3.52x faster** | **Massive speedup** |
 
-📊 **[See Full Comparison Guide](COMPARISON_GUIDE.md)** for detailed benchmarks, syntax differences, and when to use each framework.
+📊 **[See Full Comparison Guide](guides/COMPARISON_GUIDE.md)** for detailed benchmarks, syntax differences, and when to use each framework.
 
 
 ## Quick Start
