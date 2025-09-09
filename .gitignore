@@ -173,6 +173,7 @@ benchmark_tests/
 data/*
 !data/.gitkeep
 dev_examples/
+run_all_tests.py
 
 
 # Generated plots and outputs (keep specific important files)
