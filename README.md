@@ -126,27 +126,6 @@ loss, metrics = compiled.evaluate(X, y)
 - **Memory efficient** vectorized operations
 - **Smarter Losses**: `mse` auto one-hot & reshape logic; fused stable cross-entropy
 
-## Areas for Improvement (Planned)
-These are intentional omissions slated for upcoming work:
-- Limited optimizers (only SGD + momentum)
-- No Dropout / LayerNorm / BatchNorm yet
-- No convolutional layers or attention modules
-- No model save/load or ONNX interop
-- CPU-only (no device abstraction yet)
-- Benchmarks lack automated variance + hardware metadata
-- Minimal profiling tooling (no memory/timing hooks)
-
-## Development Priorities (2025 Execution Order)
-1. Adam & AdamW
-2. Model save/load (state dict via `.npz`)
-3. Dropout + LayerNorm utilities
-4. Tiny Transformer (encoder-only)
-5. ONNX export (core ops) → minimal ONNX import
-6. Conv1D then naive Conv2D
-7. Extended docs (serialization, ONNX, Transformer walkthrough)
-8. Parameter naming / registry refinement
-9. (Optional) weight decay & gradient clipping
-
 ## Complete Example
 
 See `examples/` for full fledged demos
