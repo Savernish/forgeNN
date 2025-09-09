@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- (Docs) Clarified improved `mse` behavior (auto one-hot + regression reshaping) and availability of `model.summary()` in README.
+
+### Changed
+- Optimized training loop: removed redundant full-dataset forward after each epoch; metrics now aggregated on-the-fly (no API change).
+- Fused stable softmax + cross-entropy implementation reduces intermediate allocations and duplicate exponentials.
+
+### Fixed
+- Ensured `mse` consistently handles (N,) integer class targets vs. (N,C) logits without user-side one-hot conversion.
+
+### Performance
+- Minor speed improvement from fused cross-entropy and eliminated extra per-epoch evaluation pass.
+
+### Notes
+- No breaking changes; public APIs (`compile().fit`, losses, metrics) unchanged.
+- Dropped experimental acceleration path (Numba) before release—kept code lean and dependency surface minimal.
+
 ## [1.2.1] - 2025-09-09
 
 ### Added

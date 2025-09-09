@@ -102,11 +102,15 @@ compiled = fnn.compile(model, optimizer={"lr": 0.01, "momentum": 0.9},
                   loss='cross_entropy', metrics=['accuracy'])
 compiled.fit(X, y, epochs=10, batch_size=64)
 loss, metrics = compiled.evaluate(X, y)
+
+# Tip: `mse` auto-detects 1D integer class labels for (N,C) logits and one-hot encodes internally.
+# model.summary() can be called any time after construction if an Input layer or input_shape is provided.
 ```
 
 ## Architecture
 
 - **Main API**: `forgeNN`, `forgeNN.Tensor`, `forgeNN.Sequential`, `forgeNN.Input`, `forgeNN.VectorizedMLP`
+- **Model Introspection**: `model.summary()` (Keras-like) with symbolic shape + parameter counts
 - **Examples**: Check `examples/` for MNIST and more
 
 ## Performance
@@ -120,6 +124,7 @@ loss, metrics = compiled.evaluate(X, y)
 - **100x+ speedup** over scalar implementations
 - **Production-ready** performance with educational clarity
 - **Memory efficient** vectorized operations
+- **Smarter Losses**: `mse` auto one-hot & reshape logic; fused stable cross-entropy
 
 ## Complete Example
 
