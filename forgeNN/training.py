@@ -20,12 +20,16 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tupl
 import numpy as np
 
 from .tensor import Tensor
-from .vectorized import VectorizedOptimizer, cross_entropy_loss, accuracy, mse
+from .vectorized import cross_entropy_loss, accuracy, mse
+from .optimizers import SGD, Adam, AdamW, Optimizer
 
 
 # Registries for built-in losses and metrics
 LossFn = Callable[[Tensor, np.ndarray], Tensor]
 MetricFn = Callable[[Tensor, np.ndarray], float]
+
+OPTIMIZERS = {"sgd": SGD, "adam": Adam, "adamw": AdamW}
+
 
 LOSSES: Dict[str, LossFn] = {
     "cross_entropy": cross_entropy_loss,
@@ -44,7 +48,7 @@ class CompiledModel:
     ----------
     model: Any
         A model with __call__(Tensor) and parameters() methods.
-    optimizer: VectorizedOptimizer | Dict[str, Any] | None
+    optimizer: Optimizer | Dict[str, Any] | None
         If an optimizer instance is provided, it's used as-is. If a dict
         is provided, a VectorizedOptimizer will be constructed lazily from
         model.parameters() on first use. If None, defaults to {"lr": 0.01}.
@@ -57,15 +61,14 @@ class CompiledModel:
     def __init__(
         self,
         model: Any,
-        optimizer: Optional[Union[VectorizedOptimizer, Dict[str, Any]]] = None,
+    optimizer: Optional[Union[Optimizer, Dict[str, Any]]] = None,
         loss: Union[str, LossFn] = "cross_entropy",
         metrics: Optional[Sequence[Union[str, MetricFn]]] = None,
     ) -> None:
         self.model = model
-        self._optimizer: Optional[VectorizedOptimizer] = None
-        self._opt_config: Dict[str, Any]
+        self._optimizer: Optional[Optimizer] = None
         if optimizer is None or isinstance(optimizer, dict):
-            self._opt_config = {"lr": 0.01}
+            self._opt_config: Dict[str, Any] = {"lr": 0.01}
             if isinstance(optimizer, dict):
                 self._opt_config.update(optimizer)
         else:
@@ -76,7 +79,7 @@ class CompiledModel:
         if isinstance(loss, str):
             if loss not in LOSSES:
                 raise ValueError(f"Unknown loss '{loss}'. Available: {list(LOSSES.keys())}")
-            self.loss_fn: LossFn = LOSSES[loss]
+            self.loss_fn = LOSSES[loss]
         else:
             self.loss_fn = loss
 
@@ -93,7 +96,7 @@ class CompiledModel:
                 self.metric_fns.append((getattr(m, "__name__", "metric"), m))
 
     @property
-    def optimizer(self) -> VectorizedOptimizer:
+    def optimizer(self) -> Optimizer:
         """Return the underlying optimizer, constructing it lazily if needed.
 
         Notes:
@@ -103,11 +106,15 @@ class CompiledModel:
         """
         if self._optimizer is None:
             params = self.model.parameters()
-            if not params:
-                # Try to initialize lazy params with a zero forward if possible
-                # Caller should ensure a proper dummy forward beforehand when needed.
-                pass
-            self._optimizer = VectorizedOptimizer(params, **self._opt_config)
+            # Build optimizer via factory config path
+            opt_type = self._opt_config.pop('type', 'sgd').lower()
+            cls = OPTIMIZERS.get(opt_type)
+            if cls is None:
+                raise ValueError(f"Unknown optimizer type '{opt_type}'. Available: {list(OPTIMIZERS.keys())}")
+            self._optimizer = cls(params, **self._opt_config)
+        elif getattr(self._optimizer, 'params', None) == []:
+            # Deferred binding case: user passed opt = Adam(lr=...) without params
+            self._optimizer.set_params(self.model.parameters())
         return self._optimizer
 
     def _data_loader(self, X: np.ndarray, y: np.ndarray, batch_size: int, shuffle: bool):
@@ -262,7 +269,7 @@ class CompiledModel:
 
 def compile(
     model: Any,
-    optimizer: Optional[Union[VectorizedOptimizer, Dict[str, Any]]] = None,
+    optimizer: Optional[Union[Optimizer, Dict[str, Any]]] = None,
     loss: Union[str, LossFn] = "cross_entropy",
     metrics: Optional[Sequence[Union[str, MetricFn]]] = None,
 ) -> CompiledModel:

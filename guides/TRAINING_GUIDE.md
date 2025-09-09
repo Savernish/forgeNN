@@ -23,7 +23,7 @@ model = fnn.Sequential([
 # Compile with optimizer config, loss, metrics
 compiled = fnn.compile(
     model,
-    optimizer={"lr": 0.01, "momentum": 0.9},
+    optimizer={"type": "adam", "lr": 1e-3},  # or {"lr":0.01, "momentum":0.9} for SGD
     loss='cross_entropy',
     metrics=['accuracy']
 )
@@ -40,48 +40,50 @@ logits = compiled.predict(X_test[:16])
 ## Mapping: Keras → forgeNN
 
 | Keras | forgeNN |
-|------|---------|
+|-------|---------|
 | model.compile(optimizer, loss, metrics) | compiled = fnn.compile(model, optimizer=..., loss=..., metrics=...) |
-| model.fit(X, y, epochs, batch_size, validation_data) | compiled.fit(X, y, epochs, batch_size, validation_data) |
-| model.evaluate(X, y) | compiled.evaluate(X, y) |
-| model.predict(X) | compiled.predict(X) |
+| model.fit(...) | compiled.fit(...) |
+| model.evaluate(...) | compiled.evaluate(...) |
+| model.predict(...) | compiled.predict(...) |
 
 Notes:
-- Optimizer in forgeNN can be an instance or a dict config. Dict config constructs VectorizedOptimizer with the given hyperparameters.
-- Loss names and metric names are registered; currently cross_entropy and accuracy are built-in. You can pass callables for custom behavior.
+Notes:
+- Optimizer can be:
+    * Dict config: {"type": "sgd", "lr": 0.01, "momentum": 0.9} or {"type": "adam", "lr": 1e-3} or {"type": "adamw", "lr":1e-3, "weight_decay":0.01}
+    * Instance with params: `fnn.Adam(model.parameters(), lr=1e-3)`
+    * Deferred instance (no params yet): `opt = fnn.Adam(lr=1e-3)` then pass to compile
+- Built-in losses: cross_entropy, mse. Built-in metrics: accuracy. Pass callables for custom ones.
 
 ## Mapping: PyTorch → forgeNN
 
 | PyTorch | forgeNN |
-|--------|---------|
-| criterion(outputs, targets) | loss_fn(logits, targets) inside compiled.fit (built-in with cross_entropy) |
-| optimizer.zero_grad() | handled inside compiled.fit |
-| loss.backward() | handled inside compiled.fit |
-| optimizer.step() | handled inside compiled.fit |
+|---------|---------|
+| criterion(outputs, targets) | loss_fn(logits, targets) inside compiled.fit |
+| optimizer.zero_grad() | handled internally |
+| loss.backward() | handled internally |
+| optimizer.step() | handled internally |
 
-If you prefer explicit loops, you can still create VectorizedOptimizer and write your own training loop; compile/fit is a convenience layer.
+If you prefer explicit loops, you can still create `SGD`, `Adam`, or `AdamW` and write the loop manually; `compile/fit` is optional convenience.
 
 ## Customization
 
 - Custom loss: pass loss=my_loss_fn where my_loss_fn(logits: Tensor, y: np.ndarray) -> Tensor.
 - Custom metric: pass metrics=["accuracy", my_metric_fn] where my_metric_fn(logits: Tensor, y: np.ndarray) -> float.
-- Optimizer instance: pass an existing VectorizedOptimizer(model.parameters(), lr=..., momentum=...).
+- Optimizer instance: pass `fnn.SGD(...)`, `fnn.Adam(...)` or `fnn.AdamW(...)` (with or without params yet).
 
 ## Tips for Lazy Initialization
 
 If a layer (like Dense) infers input size on the first forward, ensure parameters are created before compiling by either:
 
 ```python
-# Option A: Provide Input layer upfront
-model = fnn.Sequential([fnn.Input((input_dim,)), fnn.Dense(32) @ 'relu', fnn.Dense(10)])
+model = fnn.Sequential([
+    fnn.Input((input_dim,)), fnn.Dense(32) @ 'relu', fnn.Dense(10)
+])  # Input layer seeds shapes
 
-# Option B: Call summary with shape
-model.summary((input_dim,))
+# Or: model.summary((input_dim,))  # symbolic build
+# Or: _ = model(fnn.Tensor(np.zeros((1, input_dim), dtype=np.float32)))
 
-# Option C: Dummy forward
-_ = model(fnn.Tensor(np.zeros((1, input_dim), dtype=np.float32)))
-
-compiled = fnn.compile(model, optimizer={"lr": 0.01})
+compiled = fnn.compile(model, optimizer={"type": "adam", "lr": 1e-3})
 ```
 
 ## When to Use compile/fit
@@ -90,4 +92,4 @@ compiled = fnn.compile(model, optimizer={"lr": 0.01})
 - You are migrating from Keras or PyTorch and want minimal boilerplate
 - You prefer naming your losses/metrics and letting the loop be managed for you
 
-When you need custom schedules, mixed losses, or special hooks, write an explicit loop—forgeNN remains flexible.
+When you need custom schedules, mixed losses, gradient clipping, or hooks, write an explicit loop—forgeNN remains flexible.

@@ -37,7 +37,10 @@ Example:
 
 # Main vectorized API
 from .tensor import Tensor
-from .vectorized import VectorizedMLP, VectorizedOptimizer, cross_entropy_loss, accuracy
+from .vectorized import VectorizedMLP, cross_entropy_loss, accuracy
+from .optimizers import Optimizer, SGD, Adam, AdamW
+# Backward compatibility alias (will deprecate):
+VectorizedOptimizer = SGD
 from .layers import Layer, ActivationWrapper, Sequential, Dense, Flatten, Conv2D, MaxPool2D, Input
 from .training import compile
 
@@ -46,8 +49,9 @@ from .functions.activation import RELU, LRELU, TANH, SIGMOID, SWISH
 
 __version__ = "1.2.1"
 __all__ = [
-    'Tensor', 'VectorizedMLP', 'VectorizedOptimizer', 'cross_entropy_loss', 'accuracy',
+    'Tensor', 'VectorizedMLP', 'cross_entropy_loss', 'accuracy',
     'RELU', 'LRELU', 'TANH', 'SIGMOID', 'SWISH',
     'Layer', 'ActivationWrapper', 'Sequential', 'Dense', 'Flatten', 'Conv2D', 'MaxPool2D', 'Input',
+    'Optimizer', 'SGD', 'Adam', 'AdamW', 'VectorizedOptimizer',
     'compile'
 ]

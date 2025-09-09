@@ -1,6 +1,6 @@
 # forgeNN vs PyTorch: The Modern Comparison
 
-> **forgeNN v1.1.0**: A lean, high-performance neural network framework that's **2.8x faster** than PyTorch on small-to-medium models
+> **forgeNN v1.2.x**: A lean, high-performance neural network framework that's **2.8x faster** than PyTorch on small-to-medium models
 
 ## Executive Summary
 
@@ -17,14 +17,14 @@ forgeNN is a modern, NumPy-based neural network framework designed for **perform
 
 ## Performance Benchmarks
 
-### MNIST Classification (Updated v1.1.0)
+### MNIST Classification (Updated v1.2.x)
 
 **Configuration:**
 - Dataset: MNIST (28×28 grayscale, 10 classes)
 - Architecture: MLP (784 → 128 → 64 → 10)
 - Epochs: 10, Batch Size: 32, Learning Rate: 0.01
 
-| Metric | PyTorch | forgeNN v1.1.0 | Advantage |
+| Metric | PyTorch | forgeNN v1.2.x | Advantage |
 |--------|---------|-----------------|-----------|
 | **Training Time** | 168.03s | 37.54s | ** 4.48x faster** |
 | **Avg Epoch Time** | 16.80s | 3.75s | ** 4.48x faster** |
@@ -37,7 +37,7 @@ forgeNN is a modern, NumPy-based neural network framework designed for **perform
 - Tasks: Regression (quality score) + Classification (wine type)
 - Epochs: 50, Batch Size: 32
 
-| Metric | PyTorch | forgeNN v1.1.0 | Advantage |
+| Metric | PyTorch | forgeNN v1.2.x | Advantage |
 |--------|---------|-----------------|-----------|
 | **Training Time** | 0.554s | 0.195s | ** 2.84x faster** |
 | **Avg Epoch Time** | 11.1ms | 3.9ms | ** 2.85x faster** |
@@ -80,19 +80,16 @@ optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 criterion = nn.CrossEntropyLoss()
 ```
 
-#### forgeNN v1.1.0 Approach
+#### forgeNN v1.2.x Approach
 ```python
-import forgeNN
+import forgeNN as fnn
 
 # Initialize (clean & concise)
-model = forgeNN.VectorizedMLP(
-    input_size=784,
-    hidden_sizes=[128, 64], 
-    output_size=10,
-    activations=['relu', 'relu', 'linear']  # Simple strings!
-)
+model = fnn.VectorizedMLP(784, [128, 64], 10, ['relu', 'relu', 'linear'])
 
-optimizer = forgeNN.VectorizedOptimizer(model.parameters(), lr=0.01, momentum=0.9)
+# Choose any optimizer (now modular)
+optimizer = fnn.Adam(model.parameters(), lr=1e-3)          # Adaptive
+# optimizer = fnn.SGD(model.parameters(), lr=0.01, momentum=0.9)  # Classic
 ```
 
 **Key Differences:**
@@ -122,7 +119,7 @@ class CustomSwish(nn.Module):
         return x * torch.sigmoid(self.beta * x)
 ```
 
-#### forgeNN v1.1.0 (Unified System)
+#### forgeNN v1.2.x (Unified System)
 ```python
 # Method 1: Simple strings (recommended)
 model = forgeNN.VectorizedMLP(784, [128, 64], 10,
@@ -178,24 +175,17 @@ for epoch in range(epochs):
             print(f'Loss: {loss.item():.4f}, Acc: {accuracy:.1f}%')
 ```
 
-#### forgeNN v1.1.0 Training Loop
+#### forgeNN v1.2.x Training Loop
 ```python
 for epoch in range(epochs):
     for batch_x, batch_y in create_data_loader(X_train, y_train, batch_size):
         # Forward pass - automatic tensor handling
-        x_tensor = forgeNN.Tensor(batch_x)
-        logits = model(x_tensor)
-        
-        # Loss and accuracy - built-in functions
-        loss = forgeNN.cross_entropy_loss(logits, batch_y)
-        acc = forgeNN.accuracy(logits, batch_y)
-        
-        # Backward pass - same as PyTorch
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        
-        print(f'Loss: {loss.data:.4f}, Acc: {acc*100:.1f}%')
+    x_tensor = forgeNN.Tensor(batch_x)
+    logits = model(x_tensor)
+    loss = forgeNN.cross_entropy_loss(logits, batch_y)
+    acc = forgeNN.accuracy(logits, batch_y)
+    optimizer.zero_grad(); loss.backward(); optimizer.step()
+    print(f'Epoch {epoch}: loss={loss.data:.4f} acc={acc*100:.1f}%')
 ```
 
 **Key Differences:**
@@ -287,7 +277,7 @@ import forgeNN
 
 # Consistent string-based API
 model = forgeNN.VectorizedMLP(784, [128, 64], 10, ['relu', 'swish', 'linear'])
-optimizer = forgeNN.VectorizedOptimizer(model.parameters(), lr=0.01)
+optimizer = forgeNN.Adam(model.parameters(), lr=1e-3)
 
 # Built-in utilities
 loss = forgeNN.cross_entropy_loss(predictions, labels)
@@ -396,7 +386,7 @@ loss = forgeNN.cross_entropy_loss(outputs, targets)
 
 ## Framework Comparison Matrix
 
-| Feature | PyTorch | forgeNN v1.1.0 |
+| Feature | PyTorch | forgeNN v1.2.x |
 |---------|---------|----------------|
 | **Performance (Small Models)** | Good | **4.5x faster** |
 | **Performance (Large Models)** | **Excellent** | Good |
@@ -424,29 +414,21 @@ python example.py  # 95%+ MNIST accuracy in under 3 minutes!
 
 ### Your First forgeNN Model
 ```python
-import forgeNN
+import forgeNN as fnn
 import numpy as np
 
-# Create data
-X = np.random.randn(1000, 20)
+X = np.random.randn(1000, 20).astype(np.float32)
 y = np.random.randint(0, 3, 1000)
 
-# Build model
-model = forgeNN.VectorizedMLP(20, [32, 16], 3, ['relu', 'swish', 'linear'])
-optimizer = forgeNN.VectorizedOptimizer(model.parameters(), lr=0.01)
+model = fnn.VectorizedMLP(20, [32, 16], 3, ['relu', 'swish', 'linear'])
+optimizer = fnn.Adam(model.parameters(), lr=1e-3)
 
-# Train
 for epoch in range(10):
-    x_tensor = forgeNN.Tensor(X)
-    predictions = model(x_tensor)
-    loss = forgeNN.cross_entropy_loss(predictions, y)
-    
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
-    
-    acc = forgeNN.accuracy(predictions, y)
-    print(f"Epoch {epoch}: Loss = {loss.data:.4f}, Acc = {acc*100:.1f}%")
+    logits = model(fnn.Tensor(X))
+    loss = fnn.cross_entropy_loss(logits, y)
+    optimizer.zero_grad(); loss.backward(); optimizer.step()
+    acc = fnn.accuracy(logits, y)
+    print(f"Epoch {epoch}: loss={loss.data:.4f} acc={acc*100:.1f}%")
 ```
 
 ---

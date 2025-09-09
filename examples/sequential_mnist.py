@@ -77,7 +77,7 @@ def main():
     # Compile with built-in loss/metric and optimizer config
     compiled = fnn.compile(
         model,
-        optimizer={"lr": 0.01, "momentum": 0.9},
+        optimizer={"lr": 0.005, "momentum": 0.9},
         loss="cross_entropy",
         metrics=["accuracy"],
     )

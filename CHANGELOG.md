@@ -9,13 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - (Docs) Clarified improved `mse` behavior (auto one-hot + regression reshaping) and availability of `model.summary()` in README.
+- Modular optimizer system with new classes: `SGD`, `Adam`, and `AdamW` (decoupled weight decay)
+- Deferred optimizer parameter binding (`opt = Adam(lr=1e-3)` then pass instance directly to `compile`)
+- Ability to pass optimizer instances OR dict configs (`{"type":"adam", "lr":1e-3}` still supported)
+- Optimizer public base class `Optimizer` exported at top level
+- New example `optimizer_convergence_demo.py` comparing SGD vs Adam convergence
+- Unit tests planned for optimizer correctness (bias correction, decoupled decay) added in test suite
 
 ### Changed
 - Optimized training loop: removed redundant full-dataset forward after each epoch; metrics now aggregated on-the-fly (no API change).
 - Fused stable softmax + cross-entropy implementation reduces intermediate allocations and duplicate exponentials.
+- Documentation and guides updated to reflect new optimizer API (Sequential & Training guides, Comparison guide)
 
 ### Fixed
 - Ensured `mse` consistently handles (N,) integer class targets vs. (N,C) logits without user-side one-hot conversion.
+
+### Deprecated
+- Legacy `VectorizedOptimizer` name now an alias of `SGD` (will be removed in a future major release)
 
 ### Performance
 - Minor speed improvement from fused cross-entropy and eliminated extra per-epoch evaluation pass.

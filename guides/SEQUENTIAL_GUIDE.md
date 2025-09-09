@@ -24,28 +24,35 @@ import forgeNN as fnn
 
 # Build a simple MLP: 4 -> 8 -> 2
 model = fnn.Sequential([
-    fnn.Input((4,)),         # optional: seeds symbolic shape inference & summary
-    fnn.Dense(8) @ 'relu',   # attach ReLU via @ operator
-    fnn.Dense(2) @ 'linear'
+    fnn.Input((4,)),         # optional: seeds summary + shape inference
+    fnn.Dense(8) @ 'relu',
+    fnn.Dense(2)             # logits (linear)
 ])
 
-# Forward, loss, backward, optimize
 x = fnn.Tensor(np.random.randn(5, 4).astype(np.float32))
 logits = model(x)
-
-y = np.array([0, 1, 0, 1, 0])  # integer class targets
+y = np.array([0, 1, 0, 1, 0])
 loss = fnn.cross_entropy_loss(logits, y)
 
-opt = fnn.VectorizedOptimizer(model.parameters(), lr=0.05, momentum=0.9)
-opt.zero_grad()
-loss.backward()
-opt.step()
+# Optimizer options:
+# 1. Raw loop with SGD
+opt = fnn.SGD(model.parameters(), lr=0.05, momentum=0.9)
+opt.zero_grad(); loss.backward(); opt.step()
+
+# 2. Or Adam (adaptive)
+# opt = fnn.Adam(model.parameters(), lr=1e-3)
+# opt.zero_grad(); loss.backward(); opt.step()
+
+# 3. Or deferred instance (no params yet) + compile
+# opt = fnn.Adam(lr=1e-3)        # no params bound yet
+# compiled = fnn.compile(model, optimizer=opt, loss='cross_entropy', metrics=['accuracy'])
+# compiled.fit(train_X, train_y, epochs=5)
 ```
 
-Tip on lazy initialization: `Dense` still infers `in_features` on the first real forward if not explicitly provided. The new `model.summary()` will proactively initialize a `Dense` layer only when the incoming feature dimension is unambiguously known (e.g., via an `Input` layer or previously inferred shape). If you build an optimizer before the first forward and did not call `model.summary()`, either:
-1. Provide `in_features` explicitly, or
-2. Run a dummy forward, or
-3. Call `model.summary(input_shape=(...))` to initialize shapes.
+Tip on lazy initialization: `Dense` still infers `in_features` on the first real forward if not explicitly provided. `model.summary()` will proactively initialize a `Dense` layer only when the incoming feature dimension is resolvable (via an `Input` layer or explicit `input_shape`). With the new deferred optimizers you can now create `opt = fnn.Adam(lr=1e-3)` *before* the model has built parameters—binding happens automatically inside `compile()` or on first `optimizer` access. If you need parameters materialized early (e.g., to inspect weights), either:
+1. Provide `in_features` to `Dense`, or
+2. Include an `Input` layer and call `model.summary()`, or
+3. Run a dummy forward once.
 
 ### Model Introspection
 
@@ -108,7 +115,7 @@ import forgeNN as fnn
 model = fnn.Sequential([
     fnn.Dense(128) @ 'relu',
     fnn.Dense(64)  @ 'relu',
-    fnn.Dense(10)  @ 'linear'  # logits
+    fnn.Dense(10)              # logits (linear)
 ])
 ```
 
@@ -185,12 +192,14 @@ model.fit(X_train, y_train, epochs=10, batch_size=32)
 
 forgeNN
 ```python
-opt = fnn.VectorizedOptimizer(model.parameters(), lr=0.01)
+# Manual loop (SGD)
+opt = fnn.SGD(model.parameters(), lr=0.01, momentum=0.9)
 logits = model(fnn.Tensor(batch_x))
 loss = fnn.cross_entropy_loss(logits, batch_y)
-opt.zero_grad()
-loss.backward()
-opt.step()
+opt.zero_grad(); loss.backward(); opt.step()
+
+# Or adaptive
+# opt = fnn.Adam(model.parameters(), lr=1e-3)
 ```
 
 ## Training with compile/fit
@@ -201,20 +210,23 @@ If you prefer a Keras-like workflow, use the lightweight training wrapper:
 import forgeNN as fnn
 
 model = fnn.Sequential([
+    fnn.Input((784,)),            # ensures shapes known early (optional)
     fnn.Dense(128) @ 'relu',
     fnn.Dense(64)  @ 'relu',
-    fnn.Dense(10)  @ 'linear'
+    fnn.Dense(10)                 # logits
 ])
 
-# If using lazy Dense, run a dummy forward once to initialize parameters
-_ = model(fnn.Tensor([[0.0]*784]))
-
+# Option A: Dict config (factory builds optimizer lazily)
 compiled = fnn.compile(
     model,
-    optimizer={"lr": 0.01, "momentum": 0.9},
+    optimizer={"type": "adam", "lr": 1e-3},
     loss='cross_entropy',
     metrics=['accuracy']
 )
+
+# Option B: Deferred instance
+# opt = fnn.Adam(lr=1e-3)
+# compiled = fnn.compile(model, optimizer=opt, loss='cross_entropy', metrics=['accuracy'])
 
 compiled.fit(X_train, y_train, epochs=10, batch_size=64,
              validation_data=(X_test, y_test))
@@ -236,7 +248,7 @@ PyTorch users can skip writing the manual loop by using `compiled.fit`.
 
 - Activation attachment with @ is explicit and local: you see which activation follows a particular layer
 - Lazy initialization in Dense keeps constructor minimal for readability; specify in_features to disable laziness or use an Input layer/summary to pre-build
-- Sequential.parameters() returns trainable tensors ready for VectorizedOptimizer
+- Sequential.parameters() returns trainable tensors ready for any optimizer (SGD, Adam, AdamW)
 - Works seamlessly with Tensor’s autodiff operations implemented in forgeNN
 
 ## Migration Recipes
@@ -268,7 +280,7 @@ The repository includes unit tests that cover:
 - Dense lazy initialization and forward
 - ActivationWrapper with strings, classes, and callables
 - Sequential parameter aggregation and zero_grad
-- Optimizer interactions, including momentum buffers
+- Optimizer interactions (SGD momentum, Adam state, deferred binding)
 
 
 ## When to Use Sequential

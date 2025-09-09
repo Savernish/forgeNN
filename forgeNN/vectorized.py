@@ -14,6 +14,7 @@ Classes:
 
 import numpy as np
 from .tensor import Tensor
+from .optimizers import SGD as VectorizedOptimizer  # Backward compatibility alias
 from typing import List, Optional, Union, Callable
 from .functions.activation import RELU, LRELU, TANH, SIGMOID, SWISH
 
