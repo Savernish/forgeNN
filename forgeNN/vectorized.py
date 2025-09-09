@@ -393,39 +393,54 @@ def cross_entropy_loss(logits: Tensor, targets: np.ndarray) -> Tensor:
         >>> logits.grad.shape
         (2, 2)
     """
-    batch_size = logits.data.shape[0]
-    
-    # Numerical stability: subtract max before softmax
-    max_logits = logits.max(axis=1, keepdims=True)
-    shifted_logits = logits - max_logits
-    
-    # Compute log-softmax
-    exp_logits = shifted_logits.exp()
-    sum_exp = exp_logits.sum(axis=1, keepdims=True)
+    # Ensure targets are a contiguous int array
+    targets = np.asarray(targets, dtype=np.int64)
+    data = logits.data
+    # Cast internally to float32 for speed (keep original reference if already)
+    if data.dtype != np.float32:
+        data32 = data.astype(np.float32, copy=False)
+        # If we had to cast we still need autograd linkage, so operate through Tensor ops
+        # (casting outside graph would detach). Only cast the underlying array if safe.
+        logits.data = data32  # type: ignore
+
+    batch_size = data.shape[0]
+
+    # Numerical stability: subtract per-row max
+    max_per_row = logits.max(axis=1, keepdims=True)  # Tensor
+    shifted = logits - max_per_row  # Tensor
+
+    # exp & sum
+    exp_shifted = shifted.exp()  # Tensor
+    sum_exp = exp_shifted.sum(axis=1, keepdims=True)  # Tensor
+    # probabilities = exp / sum
+    probs = exp_shifted / sum_exp  # Tensor (softmax output)
+
+    # We need log probs for selected targets: log(softmax) = shifted - log(sum_exp)
     log_sum_exp = sum_exp.log()
-    log_probs = shifted_logits - log_sum_exp
-    
-    # Select probabilities for correct classes and compute loss directly
-    batch_indices = np.arange(batch_size)
-    selected_log_probs_data = log_probs.data[batch_indices, targets]
-    loss_data = -np.mean(selected_log_probs_data)
-    
-    # Create loss tensor with proper computation graph
-    loss = Tensor(loss_data, requires_grad=logits.requires_grad,
-                  _children=(logits,), _op='cross_entropy')
-    
-    # Proper backward pass that connects to the computation graph
+    log_probs = shifted - log_sum_exp  # Tensor
+
+    batch_idx = np.arange(batch_size)
+    selected = log_probs.data[batch_idx, targets]
+    loss_value = -float(np.mean(selected))
+
+    # Create scalar loss tensor referencing logits for gradient flow
+    loss = Tensor(loss_value, requires_grad=logits.requires_grad, _children=(logits,), _op='cross_entropy')
+
     if logits.requires_grad:
+        # Capture needed arrays once
+        probs_data = probs.data  # shape (B,C)
+        targets_local = targets
+        bsz = batch_size
+
         def _backward():
-            # Softmax gradient
-            probs = (shifted_logits - log_sum_exp).exp().data
-            grad = probs.copy()
-            grad[batch_indices, targets] -= 1
-            grad /= batch_size
+            # Gradient of cross-entropy w.r.t logits: (probs - one_hot)/B
+            grad = probs_data.copy()
+            grad[batch_idx, targets_local] -= 1.0
+            grad /= bsz
             logits.grad += grad * loss.grad
-        
+
         loss._backward = _backward
-    
+
     return loss
 
 def accuracy(logits: Tensor, targets: np.ndarray) -> float:

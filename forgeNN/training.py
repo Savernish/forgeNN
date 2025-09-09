@@ -155,29 +155,36 @@ class CompiledModel:
             Loss and metrics are aggregated sample-weighted across batches.
         """
         for epoch in range(1, epochs + 1):
-            # Sample-weighted aggregation to reduce jitter
+            # On-the-fly aggregation without post-epoch extra forward pass
             loss_sum = 0.0
             weight_sum = 0
             metric_sums = {name: 0.0 for name, _ in self.metric_fns}
+            correct_total = 0  # special path for accuracy to avoid recompute
             for bx, by in self._data_loader(X, y, batch_size, shuffle):
                 logits = self.model(Tensor(bx))
                 loss = self.loss_fn(logits, by)
 
-                # Backprop & update
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
 
-                # Accumulate weighted by batch size
                 bsz = len(by)
-                loss_sum += float(loss.data) * bsz
                 weight_sum += bsz
+                loss_sum += float(loss.data) * bsz
                 for name, fn in self.metric_fns:
-                    metric_sums[name] += float(fn(logits, by)) * bsz
+                    if name == 'accuracy':
+                        preds = np.argmax(logits.data, axis=1)
+                        correct_total += int(np.sum(preds == by))
+                    else:
+                        metric_sums[name] += float(fn(logits, by)) * bsz
 
-            # Aggregate
             avg_loss = loss_sum / max(weight_sum, 1)
-            avg_metrics = {name: (metric_sums[name] / max(weight_sum, 1)) for name, _ in self.metric_fns}
+            avg_metrics = {}
+            for name, _ in self.metric_fns:
+                if name == 'accuracy':
+                    avg_metrics[name] = correct_total / max(weight_sum, 1)
+                else:
+                    avg_metrics[name] = metric_sums[name] / max(weight_sum, 1)
 
             # Validation
             val_str = ""
