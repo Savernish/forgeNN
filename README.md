@@ -47,7 +47,7 @@ pip install forgeNN
 | Test Accuracy | 97.30% | 97.37% | **+0.07% better** |
 | Small Models (<109k params) | Baseline | **3.52x faster** | **Massive speedup** |
 
-📊 **[See Full Comparison Guide](guides/COMPARISON_GUIDE.md)** for detailed benchmarks, syntax differences, and when to use each framework.
+📊 **[See Full Comparison Guide](guides/COMPARISON_GUIDE.md)** for detailed benchmarks, syntax differences, and when to use each framework. *Note: single-machine indicative results; not statistically rigorous multi-run averages.*
 
 
 ## Quick Start
@@ -126,6 +126,27 @@ loss, metrics = compiled.evaluate(X, y)
 - **Memory efficient** vectorized operations
 - **Smarter Losses**: `mse` auto one-hot & reshape logic; fused stable cross-entropy
 
+## Areas for Improvement (Planned)
+These are intentional omissions slated for upcoming work:
+- Limited optimizers (only SGD + momentum)
+- No Dropout / LayerNorm / BatchNorm yet
+- No convolutional layers or attention modules
+- No model save/load or ONNX interop
+- CPU-only (no device abstraction yet)
+- Benchmarks lack automated variance + hardware metadata
+- Minimal profiling tooling (no memory/timing hooks)
+
+## Development Priorities (2025 Execution Order)
+1. Adam & AdamW
+2. Model save/load (state dict via `.npz`)
+3. Dropout + LayerNorm utilities
+4. Tiny Transformer (encoder-only)
+5. ONNX export (core ops) → minimal ONNX import
+6. Conv1D then naive Conv2D
+7. Extended docs (serialization, ONNX, Transformer walkthrough)
+8. Parameter naming / registry refinement
+9. (Optional) weight decay & gradient clipping
+
 ## Complete Example
 
 See `examples/` for full fledged demos
@@ -138,8 +159,22 @@ See `examples/` for full fledged demos
 - **Issues**: GitHub Issues for bug reports and feature requests
 
 ## Roadmap
+### Before 2026 (2025 Remaining Milestones – ordered)
+1. Adam / AdamW
+2. Model saving & loading (state dict + `.npz`)
+3. Dropout + LayerNorm
+4. Tiny Transformer example (encoder-only)
+5. ONNX export (Sequential/Dense/Flatten/activations) then basic import (subset)
+6. Conv1D → Conv2D (naive)
+7. Documentation: serialization guide, ONNX guide, Transformer walkthrough
+8. Parameter registry refinement
 
-_To be implemented_
+### Q1 2026 (Early 2026 Targets)
+- CUDA / GPU backend prototype (Tensor device abstraction)
+- Formal architecture & design documents (graph execution, autograd internals)
+- Expanded documentation site (narrative design + performance notes)
+
+_Items above may be reprioritized based on user feedback; GPU & design docs explicitly deferred to early 2026._
 
 ## Contributing
 
