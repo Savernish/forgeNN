@@ -140,8 +140,8 @@ See `examples/` for full fledged demos
 
 ## Roadmap
 ### Before 2026 (2025 Remaining Milestones – ordered)
-1. ~Adam / AdamW~ 🗹 (Completed September 2025) 
-2. Dropout + LayerNorm ☐
+1. ~Adam / AdamW~ 🗹 (Completed in v1.3.0) 
+2. ~Dropout + LayerNorm~ 🗹 (Completed in v1.3.0)
 3. Model saving & loading (state dict + `.npz`) ☐
 4. Conv1D → Conv2D (naive) ☐
 5. Tiny Transformer example (encoder-only) ☐

@@ -6,9 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
-## [1.2.2] - 2025-09-10
+## [1.3.0] - 2025-09-10
+
+### Last Major Release Before 2.x Update!
 
 ### Added
+- Added `Dropout` layer with training/inference modes and integrated into `Sequential`.
+- New example `examples/dropout_example.py` demonstrating dropout regularization on MNIST with accuracy plots.
 - (Docs) Clarified improved `mse` behavior (auto one-hot + regression reshaping) and availability of `model.summary()` in README.
 - Modular optimizer system with new classes: `SGD`, `Adam`, and `AdamW` (decoupled weight decay)
 - Deferred optimizer parameter binding (`opt = Adam(lr=1e-3)` then pass instance directly to `compile`)
@@ -21,7 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optimized training loop: removed redundant full-dataset forward after each epoch; metrics now aggregated on-the-fly (no API change).
 - Fused stable softmax + cross-entropy implementation reduces intermediate allocations and duplicate exponentials.
 - Documentation and guides updated to reflect new optimizer API (Sequential & Training guides, Comparison guide)
-
+- Adam optimizer default `eps` changed to `1e-7` for improved numerical stability (matches PyTorch/TensorFlow defaults)
+- Vectorized class now uses dtype float32 consistently for weights and biases (was float64 in some cases)
 ### Fixed
 - Ensured `mse` consistently handles (N,) integer class targets vs. (N,C) logits without user-side one-hot conversion.
 
