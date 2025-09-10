@@ -83,7 +83,7 @@ model = fnn.Sequential([
 # Or: model.summary((input_dim,))  # symbolic build
 # Or: _ = model(fnn.Tensor(np.zeros((1, input_dim), dtype=np.float32)))
 
-compiled = fnn.compile(model, optimizer={"type": "adam", "lr": 1e-3})
+compiled = fnn.compile(model, optimizer={"type": "adam", "lr": 1e-3}) # or call adam beforehand and pass instance
 ```
 
 ## When to Use compile/fit

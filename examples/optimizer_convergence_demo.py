@@ -79,7 +79,7 @@ def train(model, optimizer, X, y, epochs=15, batch_size=64):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
+    parser.add_argument('--seed', type=int, default=24, help='Random seed for reproducibility')
     parser.add_argument('--epochs', type=int, default=15)
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--sgd-lr', type=float, default=0.03)

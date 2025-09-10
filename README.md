@@ -55,39 +55,38 @@ pip install forgeNN
 ### High-Performance Training
 
 ```python
-import forgeNN
+import numpy as np
 from sklearn.datasets import make_classification
+from sklearn.preprocessing import StandardScaler
+import forgeNN as fnn
 
-# Generate dataset
-X, y = make_classification(n_samples=1000, n_features=20, n_classes=3)
+# Generate dataset (reproducible)
+X, y = make_classification(
+    n_samples=1000,
+    n_features=20,
+    n_classes=3,
+    n_informative=3,
+    random_state=24
+)
 
-# Create vectorized model  
-model = forgeNN.VectorizedMLP(20, [64, 32], 3)
-optimizer = forgeNN.VectorizedOptimizer(model.parameters(), lr=0.01)
+# Feature scaling helps optimization (especially with momentum/Adam)
+X = StandardScaler().fit_transform(X).astype(np.float32)
 
-# Fast batch training
-for epoch in range(10):
-    # Convert to tensors
-    x_batch = forgeNN.Tensor(X)
-    
-    # Forward pass
-    logits = model(x_batch)
-    loss = forgeNN.cross_entropy_loss(logits, y)
-    
-    # Backward pass
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
-    
-    acc = forgeNN.accuracy(logits, y)
+# Tiny, didactic training loop (manual zero_grad/backward/step)
+model = fnn.VectorizedMLP(20, [64, 32], 3)
+optimizer = fnn.Adam(model.parameters(), lr=0.01)  # or: fnn.VectorizedOptimizer(..., momentum=0.9)
+
+for epoch in range(30):
+    logits = model(fnn.Tensor(X))
+    loss = fnn.cross_entropy_loss(logits, y)
+    optimizer.zero_grad(); loss.backward(); optimizer.step()
+    acc = fnn.accuracy(logits, y)
     print(f"Epoch {epoch}: Loss = {loss.data:.4f}, Acc = {acc*100:.1f}%")
 ```
 
 ### Keras-like Training (compile/fit)
 
 ```python
-import forgeNN as fnn
-
 model = fnn.Sequential([
     fnn.Input((20,)),        # optional Input layer seeds summary & shapes
     fnn.Dense(64) @ 'relu',
@@ -97,9 +96,11 @@ model = fnn.Sequential([
 
 # Optionally inspect architecture
 model.summary()              # or model.summary((20,)) if no Input layer
-
-compiled = fnn.compile(model, optimizer={"lr": 0.01, "momentum": 0.9},
-                  loss='cross_entropy', metrics=['accuracy'])
+opt = fnn.Adam(lr=1e-3)      # or other optimizers (adamw, sgd, etc)
+compiled = fnn.compile(model,
+                    optimizer=opt,
+                    loss='cross_entropy',
+                    metrics=['accuracy'])
 compiled.fit(X, y, epochs=10, batch_size=64)
 loss, metrics = compiled.evaluate(X, y)
 
@@ -139,14 +140,14 @@ See `examples/` for full fledged demos
 
 ## Roadmap
 ### Before 2026 (2025 Remaining Milestones – ordered)
-1. Adam / AdamW
-2. Model saving & loading (state dict + `.npz`)
-3. Dropout + LayerNorm
-4. Tiny Transformer example (encoder-only)
-5. ONNX export (Sequential/Dense/Flatten/activations) then basic import (subset)
-6. Conv1D → Conv2D (naive)
-7. Documentation: serialization guide, ONNX guide, Transformer walkthrough
-8. Parameter registry refinement
+1. ~Adam / AdamW~ 🗹 (Completed September 2025) 
+2. Dropout + LayerNorm ☐
+3. Model saving & loading (state dict + `.npz`) ☐
+4. Conv1D → Conv2D (naive) ☐
+5. Tiny Transformer example (encoder-only) ☐
+6. ONNX export (Sequential/Dense/Flatten/activations) then basic import (subset) ☐
+7. Documentation: serialization guide, ONNX guide, Transformer walkthrough ☐
+8. Parameter registry refinement ☐
 
 ### Q1 2026 (Early 2026 Targets)
 - CUDA / GPU backend prototype (Tensor device abstraction)

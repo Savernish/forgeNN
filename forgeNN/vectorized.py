@@ -261,6 +261,10 @@ class VectorizedMLP:
 
 class VectorizedOptimizer:
     """
+    Notes:
+        **Deprecated in v1.2.2:** Use `forgeNN.optimizers.SGD` for consistency.
+        This class is kept for backward compatibility only and may be removed in future releases.
+    
     Simple SGD optimizer for vectorized training.
     
     Implements stochastic gradient descent with optional momentum
