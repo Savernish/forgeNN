@@ -35,7 +35,7 @@ def build_models(input_dim: int = 20, lr: float = 1e-3):
         fnn.Dropout(0.3),
         fnn.Dense(32) @ 'relu',
         fnn.Dropout(0.2),
-        fnn.Dense(3),
+        fnn.Dense(3) @ 'linear',
     ])
     with_dropout.summary((input_dim,))
 
@@ -86,7 +86,7 @@ def build_models(input_dim: int = 20, lr: float = 1e-3):
 # Removed helper builders; Keras model is built in build_models when available
 
 
-def train_compare(X_train, y_train, X_val, y_val, epochs=20, batch_size=64, lr=1e-3):
+def train_compare(X_train, y_train, X_val, y_val, epochs=50, batch_size=64, lr=1e-3):
     """Train baseline vs dropout using compile/fit and collect per-epoch metrics.
 
     We pre-shuffle once per epoch and call fit with shuffle=False so both models
@@ -210,7 +210,7 @@ def plot_history(hist, out_path='dropout_overfitting.png'):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--epochs', type=int, default=15)
+    parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--lr', type=float, default=1e-3)
     args = parser.parse_args()

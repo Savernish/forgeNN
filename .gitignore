@@ -172,6 +172,7 @@ deployment/
 dev_examples/
 run_all_tests.py
 examples/sequential_mnist.py
+!dropout_overfitting.png
 
 
 # Generated plots and outputs (keep specific important files)
