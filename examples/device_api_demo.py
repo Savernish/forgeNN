@@ -3,6 +3,10 @@
 Selects 'cuda' if available, otherwise falls back to 'cpu', and runs a short
 compile/fit/evaluate cycle. CUDA is not implemented yet; this shows usage.
 """
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 import numpy as np
 import forgeNN as fnn
 

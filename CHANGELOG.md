@@ -17,10 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `get_default_device`, `set_default_device`, `is_cuda_available`, and `use_device(...)` context manager.
 - Backends scaffold in `forgeNN/backends/`:
   - `cpu.py` NumPy backend and `cuda.py` placeholder (optional CuPy-based; raises if CuPy missing).
-- ONNX I/O stubs in `forgeNN/onnx/io.py` with lazy dependency check (`export_onnx`, `load_onnx`).
+- ONNX Export – Stage 1 (MVP) complete in `forgeNN/onnx/io.py`:
+  - Export supported for Sequential MLPs with: `Input`, `Dense`→`Gemm` (auto `transB`), `Flatten`, and activations (`Relu`, `Sigmoid`, `Tanh`; optional `Softmax`).
+  - `Dropout` is folded away in eval mode (skipped during export).
+  - Default opset 13; forces IR v10 for compatibility with older onnxruntime builds.
+  - Parity verified with onnxruntime (max diff ~1e-6). TensorFlow via onnx-tf is optional and may require tensorflow-addons (Windows caveat).
+  - Import remains TODO (`load_onnx` still raises `NotImplementedError`).
 - Optional extras in packaging: `[onnx]`, `[cuda]`, and `[all]` in `pyproject.toml`.
 - New docs: `ARCHITECTURE.md` plus short READMEs under `runtime/`, `backends/`, and `onnx/` describing intent.
-- Example: `examples/device_api_demo.py` showing device API usage and a quick 1-epoch run.
+- Examples:
+  - `examples/device_api_demo.py` showing device API usage and a quick 1-epoch run.
+  - `examples/onnx_example.py` training a small MLP, exporting to ONNX, and running it via onnxruntime (fallback) or TensorFlow (onnx-tf) with parity checks.
 
 ### Changed
 - Core Tensor moved to `forgeNN/core/tensor.py`. The original `forgeNN/tensor.py` now re-exports as a temporary compatibility shim.
@@ -48,8 +55,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Small speedups from reduced activation wrapper overhead, simplified shape inference, and fused gradient reductions.
 
 ### Notes
-- CUDA and ONNX are scaffolds only at this time: CUDA backend is not wired to Tensor ops yet; ONNX export/import functions intentionally raise `NotImplementedError` until implemented.
+- CUDA remains a scaffold at this time: backend is not wired to Tensor ops yet.
+- ONNX export Stage 1 (subset) is implemented; ONNX import is not implemented yet and will raise `NotImplementedError`.
 - Public API remains familiar; examples updated accordingly. A deprecation window exists for the `Tensor` import path via the shim.
+
+#### ONNX Export (Stage 1) Details
+- Scope: Sequential-only, feed-forward MLP graphs without branches.
+- Ops: `Gemm` (Dense), `Relu`/`Sigmoid`/`Tanh` (activations), `Flatten`, optional `Softmax` at the end, `Input` placeholder. `Dropout` is folded in eval and skipped.
+- Shapes: output `ValueInfo` carries symbolic batch ("N") and concrete feature dims; passes ONNX checker and shape inference.
+- Tooling: exports with opset 13; sets IR to 10 for older onnxruntime (configurable). Parity tested on Windows via onnxruntime. onnx-tf works when TensorFlow + tensorflow-addons are properly installed (Linux easiest).
 
 ## [1.3.0] - 2025-09-10
 
