@@ -41,7 +41,7 @@ from .vectorized import VectorizedMLP, cross_entropy_loss, accuracy
 from .optimizers import Optimizer, SGD, Adam, AdamW
 # Backward compatibility alias (will deprecate):
 VectorizedOptimizer = SGD
-from .layers import Layer, ActivationWrapper, Sequential, Dense, Flatten, Conv2D, MaxPool2D, Input
+from .layers import Layer, ActivationWrapper, Sequential, Dense, Flatten, Conv2D, MaxPool2D, Input, Dropout
 from .training import compile
 
 # Activation functions for advanced usage
@@ -51,7 +51,7 @@ __version__ = "1.2.1"
 __all__ = [
     'Tensor', 'VectorizedMLP', 'cross_entropy_loss', 'accuracy',
     'RELU', 'LRELU', 'TANH', 'SIGMOID', 'SWISH',
-    'Layer', 'ActivationWrapper', 'Sequential', 'Dense', 'Flatten', 'Conv2D', 'MaxPool2D', 'Input',
+    'Layer', 'ActivationWrapper', 'Sequential', 'Dense', 'Flatten', 'Conv2D', 'MaxPool2D', 'Input', 'Dropout',
     'Optimizer', 'SGD', 'Adam', 'AdamW', 'VectorizedOptimizer',
     'compile'
 ]

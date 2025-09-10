@@ -122,7 +122,7 @@ class Adam(Optimizer):
         params: Optional[Iterable] = None,  # type: ignore[Any]
         lr: float = 1e-3,
         betas: Tuple[float, float] = (0.9, 0.999),
-        eps: float = 1e-8,
+    eps: float = 1e-7,
         weight_decay: float = 0.0,
     ):
         super().__init__(params)

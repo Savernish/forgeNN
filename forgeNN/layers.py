@@ -54,6 +54,14 @@ class Layer:
         """
         return self.forward(x)
 
+    # Train/eval toggles (no-op by default unless a layer uses self.training)
+    def train(self, flag: bool = True) -> "Layer":
+        self.training = bool(flag)
+        return self
+
+    def eval(self) -> "Layer":
+        return self.train(False)
+
     # Allow attaching activation: Layer @ "relu" -> ActivationWrapper(layer, "relu")
     def __matmul__(self, activation: ActivationType) -> "ActivationWrapper":
         """Return an activation-wrapped version of this layer.
@@ -151,6 +159,12 @@ class ActivationWrapper(Layer):
     def parameters(self) -> List[Tensor]:
         return self.layer.parameters()
 
+    def train(self, flag: bool = True) -> "ActivationWrapper":
+        self.training = bool(flag)
+        if hasattr(self.layer, 'train'):
+            self.layer.train(flag)
+        return self
+
 
 class Sequential(Layer):
     """Container that applies layers in sequence.
@@ -191,6 +205,16 @@ class Sequential(Layer):
         for layer in self.layers:
             out = layer(out)
         return out
+
+    def train(self, flag: bool = True) -> "Sequential":
+        self.training = bool(flag)
+        for layer in self.layers:
+            if hasattr(layer, 'train'):
+                layer.train(flag)
+        return self
+
+    def eval(self) -> "Sequential":
+        return self.train(False)
 
     def parameters(self) -> List[Tensor]:
         """Collect trainable parameters from all sub-layers."""
@@ -372,6 +396,9 @@ class Sequential(Layer):
                 core._init_params(in_shape[1])
                 return (None, core.out_features)
             return None
+        # Dropout and other shape-preserving layers
+        if core.__class__.__name__ == 'Dropout':
+            return in_shape
         # For activation wrappers handled outside, for others unknown
         return in_shape if isinstance(core, ActivationWrapper) else None
 
@@ -463,10 +490,10 @@ class Dense(Layer):
         fan_in, fan_out = in_features, self.out_features
         limit = float(np.sqrt(6.0 / (fan_in + fan_out)))
         self.W = Tensor(
-            np.random.uniform(-limit, limit, (in_features, self.out_features)),
+            np.random.uniform(-limit, limit, (in_features, self.out_features)).astype(np.float32),
             requires_grad=True,
         )
-        self.b = Tensor([0.0] * self.out_features, requires_grad=True)
+        self.b = Tensor(np.zeros(self.out_features, dtype=np.float32), requires_grad=True)
 
     def forward(self, x: Tensor) -> Tensor:
         """Compute ``x @ W + b`` with lazy initialization if needed."""
@@ -502,6 +529,47 @@ class Flatten(Layer):
         """Flatten has no trainable parameters."""
         return []
 
+class Dropout(Layer):
+    """Randomly zero inputs during training with inverted dropout scaling.
+
+    Args:
+        rate: Probability of dropping an activation in [0, 1).
+        seed: Optional RNG seed for reproducible masks (useful in tests).
+
+    Behavior:
+        - Training: y = x * mask / (1 - rate), mask ~ Bernoulli(1-rate)
+        - Eval: pass-through
+        - With current training loop, eval typically sets requires_grad=False;
+          we honor that by disabling dropout when x.requires_grad is False.
+    """
+
+    def __init__(self, rate: float = 0.5, seed: Optional[int] = None):
+        if not (0.0 <= rate < 1.0):
+            raise ValueError("Dropout rate must be in [0, 1)")
+        self.rate = float(rate)
+        self.training = True  # future-proofing for model.train()/eval()
+        self._seed = seed
+        self._rng = None  # lazy init to avoid importing numpy at module load
+
+    def _rng_or_np(self):
+        import numpy as np  # local import to keep module dependencies light
+        if self._rng is None and self._seed is not None:
+            self._rng = np.random.default_rng(self._seed)
+        return self._rng if self._rng is not None else np.random
+
+    def forward(self, x: Tensor) -> Tensor:
+        # Disable if no dropout or in eval mode; also disable when input has no grad (evaluation path)
+        if self.rate == 0.0 or not self.training or not getattr(x, 'requires_grad', True):
+            return x
+        p_keep = 1.0 - self.rate
+        rng = self._rng_or_np()
+        mask = (rng.random(x.shape) < p_keep)
+        # ensure dtype matches x and keep mask out of autograd graph
+        mask = mask.astype(x.data.dtype, copy=False)
+        return x * Tensor(mask, requires_grad=False) / p_keep
+
+    def parameters(self) -> List[Tensor]:
+        return []
 
 # Optional placeholders for future convolutional/pooling layers.
 # These are provided for API completeness and can be implemented later.
