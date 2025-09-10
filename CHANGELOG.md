@@ -6,6 +6,51 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
+## [2.0.0] - 2025-09-10
+
+### Highlights
+- V2 architecture: internal re-organization, device/runtime/backends scaffolding, and ONNX stubs. Public training API remains familiar (`Sequential`, `compile/fit/evaluate/predict`).
+
+### Added
+- New `forgeNN/nn/` package consolidating `activations`, `losses`, and `metrics` with simple registries.
+- Runtime device API in `forgeNN/runtime/device.py`:
+  - `get_default_device`, `set_default_device`, `is_cuda_available`, and `use_device(...)` context manager.
+- Backends scaffold in `forgeNN/backends/`:
+  - `cpu.py` NumPy backend and `cuda.py` placeholder (optional CuPy-based; raises if CuPy missing).
+- ONNX I/O stubs in `forgeNN/onnx/io.py` with lazy dependency check (`export_onnx`, `load_onnx`).
+- Optional extras in packaging: `[onnx]`, `[cuda]`, and `[all]` in `pyproject.toml`.
+- New docs: `ARCHITECTURE.md` plus short READMEs under `runtime/`, `backends/`, and `onnx/` describing intent.
+- Example: `examples/device_api_demo.py` showing device API usage and a quick 1-epoch run.
+
+### Changed
+- Core Tensor moved to `forgeNN/core/tensor.py`. The original `forgeNN/tensor.py` now re-exports as a temporary compatibility shim.
+- All internal modules and examples updated to import `Tensor` from `forgeNN.core.tensor` (please migrate your imports accordingly).
+- `Dropout` fully rewritten with inverted scaling and clear train/eval behavior; lower overhead.
+- `ActivationWrapper` now caches/uses pre-resolved activation callables to avoid per-forward overhead.
+- Defaults aligned for smoother training parity with Keras/TensorFlow:
+  - Adam `eps=1e-7` and float32 parameter/math defaults.
+- Initialization and shapes:
+  - `Dense` uses Xavier/Glorot init; `Flatten` simplified; `Input` clarified for summary/shape seeding.
+
+### Fixed
+- Broadcasting-aware gradient reductions centralized (`_sum_to_shape`) for add/mul and friends.
+- Proper gradients for division, including right-division (`__rtruediv__`).
+- `mean.backward` supports tuple axes with correct scaling; `max.backward` stabilized for ties with epsilon.
+
+### Deprecated
+- Top-level `forgeNN/tensor.py` is a compatibility shim. It will be removed in a future release—please update imports to `forgeNN.core.tensor`.
+- `vectorized.py` kept only as a light shim; prefer `nn/` + `Sequential` path.
+
+### Removed
+- Aggressive cleanup of unused/deprecated assets: old guides, legacy scripts, and test scaffolding.
+
+### Performance
+- Small speedups from reduced activation wrapper overhead, simplified shape inference, and fused gradient reductions.
+
+### Notes
+- CUDA and ONNX are scaffolds only at this time: CUDA backend is not wired to Tensor ops yet; ONNX export/import functions intentionally raise `NotImplementedError` until implemented.
+- Public API remains familiar; examples updated accordingly. A deprecation window exists for the `Tensor` import path via the shim.
+
 ## [1.3.0] - 2025-09-10
 
 ### Last Major Release Before 2.x Update!

@@ -1,57 +1,28 @@
 """
-forgeNN - High-Performance Neural Network Framework
-==================================================
+forgeNN - Minimal, fast neural network framework (v2)
+====================================================
 
-A modern, fast neural network framework focused on performance and clean APIs.
-
-Main API:
-    Tensor: Vectorized automatic differentiation with NumPy backend
-    VectorizedMLP: High-performance neural networks (2.6x faster than PyTorch)
-    VectorizedOptimizer: Efficient SGD with momentum
-    Activation Functions: RELU, LRELU, TANH, SIGMOID, SWISH
-
-Features:
-    • 2.6x faster training than PyTorch on small-medium datasets
-    • Clean, intuitive API design
-    • Full automatic differentiation support
-    • Flexible activation system (string/class/callable)
-    • Efficient vectorized operations
-
-Example:
-    >>> import forgeNN
-    >>> 
-    >>> # Simple string-based activations (most common)
-    >>> model = forgeNN.VectorizedMLP(784, [128, 64], 10, 
-    ...                              activations=['relu', 'swish', 'linear'])
-    >>> 
-    >>> # Or use activation classes for advanced control
-    >>> model = forgeNN.VectorizedMLP(784, [128, 64], 10,
-    ...                              activations=[forgeNN.RELU(), forgeNN.SWISH(), None])
-    >>> 
-    >>> # Train on data
-    >>> x = forgeNN.Tensor(data)
-    >>> output = model(x)
-    >>> loss = forgeNN.cross_entropy_loss(output, labels)
-    >>> loss.backward()
+Lean public API with stable, documented entry points. Docstrings preserved.
 """
 
-# Main vectorized API
-from .tensor import Tensor
-from .vectorized import VectorizedMLP, cross_entropy_loss, accuracy
+from .core.tensor import Tensor
+from .layers import Layer, ActivationWrapper, Sequential, Dense, Flatten, Input, Dropout
 from .optimizers import Optimizer, SGD, Adam, AdamW
-# Backward compatibility alias (will deprecate):
-VectorizedOptimizer = SGD
-from .layers import Layer, ActivationWrapper, Sequential, Dense, Flatten, Conv2D, MaxPool2D, Input, Dropout
 from .training import compile
+from .nn.losses import cross_entropy_loss
+from .nn.metrics import accuracy
+from .runtime import get_default_device, set_default_device, is_cuda_available, use_device
+from .onnx import export_onnx, load_onnx
 
-# Activation functions for advanced usage
-from .functions.activation import RELU, LRELU, TANH, SIGMOID, SWISH
-
-__version__ = "1.3.0"
+__version__ = "2.0.0"
 __all__ = [
-    'Tensor', 'VectorizedMLP', 'cross_entropy_loss', 'accuracy',
-    'RELU', 'LRELU', 'TANH', 'SIGMOID', 'SWISH',
-    'Layer', 'ActivationWrapper', 'Sequential', 'Dense', 'Flatten', 'Conv2D', 'MaxPool2D', 'Input', 'Dropout',
-    'Optimizer', 'SGD', 'Adam', 'AdamW', 'VectorizedOptimizer',
-    'compile'
+    'Tensor',
+    'Layer', 'ActivationWrapper', 'Sequential', 'Dense', 'Flatten', 'Input', 'Dropout',
+    'Optimizer', 'SGD', 'Adam', 'AdamW',
+    'compile',
+    'cross_entropy_loss', 'accuracy',
+    # runtime
+    'get_default_device', 'set_default_device', 'is_cuda_available', 'use_device',
+    # onnx
+    'export_onnx', 'load_onnx'
 ]

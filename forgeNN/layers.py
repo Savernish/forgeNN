@@ -15,13 +15,13 @@ Usage example:
 Notes:
     - Activations can be strings ('relu', 'tanh', 'sigmoid', 'swish', 'linear'),
       activation classes (RELU, TANH, etc.), or callables taking a Tensor.
-    - Parameters are collected from all layers to work with VectorizedOptimizer.
+    - Parameters are collected from all layers for optimization.
 """
 
 from typing import Callable, Iterable, List, Optional, Sequence, Union, Tuple
 
-from .tensor import Tensor
-from .vectorized import ACTIVATION_FUNCTIONS  # Reuse unified activation mapping
+from .core.tensor import Tensor
+from .nn.activations import ACTIVATION_FUNCTIONS  # v2 unified activation mapping
 
 
 ActivationType = Union[str, type, Callable[[Tensor], Tensor]]
@@ -123,38 +123,25 @@ class ActivationWrapper(Layer):
     def __init__(self, layer: Layer, activation: ActivationType):
         self.layer = layer
         self.activation = activation
-
-    def _apply_activation(self, x: Tensor) -> Tensor:
-        """Apply the configured activation to tensor ``x``.
-
-        Supports:
-            - String activations registered in the shared mapping
-            - Activation classes or instances (e.g., RELU)
-            - Arbitrary callables: ``fn(Tensor) -> Tensor``
-        """
-        # Direct callable (not a class): fn(Tensor) -> Tensor
-        if callable(self.activation) and not isinstance(self.activation, type):
-            if hasattr(self.activation, 'forward'):
-                return self.activation.forward(x)  # activation class instance
-            return self.activation(x)
-
-        # String or known activation types via shared mapping
-        if self.activation in ACTIVATION_FUNCTIONS:
-            return ACTIVATION_FUNCTIONS[self.activation](x)
-
-        # Instance of activation class
-        if type(self.activation) in ACTIVATION_FUNCTIONS:
-            return ACTIVATION_FUNCTIONS[type(self.activation)](x)
-
-        # Fallback: method on Tensor
-        if hasattr(x, str(self.activation)):
-            return getattr(x, str(self.activation))()
-
-        raise ValueError(f"Unknown activation: {self.activation}")
+        # Pre-resolve to a callable to reduce per-forward overhead
+        act = activation
+        fn = None
+        if callable(act) and not isinstance(act, type):
+            if hasattr(act, 'forward'):
+                fn = lambda t, a=act: a.forward(t)
+            else:
+                fn = act
+        elif act in ACTIVATION_FUNCTIONS:
+            fn = ACTIVATION_FUNCTIONS[act]
+        elif isinstance(act, type) and act in ACTIVATION_FUNCTIONS:
+            fn = ACTIVATION_FUNCTIONS[act]
+        else:
+            name = str(act)
+            fn = lambda t, n=name: getattr(t, n)()
+        self._fn: Callable[[Tensor], Tensor] = fn
 
     def forward(self, x: Tensor) -> Tensor:
-        """Forward pass: layer(x) followed by activation."""
-        return self._apply_activation(self.layer(x))
+        return self._fn(self.layer(x))
 
     def parameters(self) -> List[Tensor]:
         return self.layer.parameters()
@@ -228,122 +215,7 @@ class Sequential(Layer):
         for p in self.parameters():
             p.zero_grad()
 
-    def _build(self) -> None:
-        """Symbolically build the network by initializing layer parameters.
-
-        Uses the shape information from the Input layer to initialize Dense layers
-        that were defined without explicit in_features. No lazy initialization will
-        occur later; Dense layers must be ready after construction.
-        """
-        input_layer = self.layers[0]
-        assert isinstance(input_layer, Input)
-        current_shape = (None,) + tuple(input_layer.shape)
-        for layer in self.layers[1:]:
-            # Unwrap activation wrapper for shape / init handling
-            target = layer.layer if isinstance(layer, ActivationWrapper) else layer
-            if isinstance(target, Flatten):
-                if len(current_shape) > 2:
-                    prod = 1
-                    for d in current_shape[1:]:
-                        prod *= d
-                    current_shape = (None, prod)
-                # else unchanged
-            elif isinstance(target, Dense):
-                if target.W is None:
-                    # Determine in_features from current_shape
-                    if len(current_shape) == 2 and current_shape[1] is not None:
-                        in_feats = current_shape[1]
-                    else:
-                        # Flatten implicit multi-d input
-                        prod = 1
-                        for d in current_shape[1:]:
-                            prod *= d
-                        in_feats = prod
-                    target._init_params(in_feats)
-                current_shape = (None, target.out_features)
-            # Other layer types (conv/pool) not implemented: keep shape conservative
-        self._built = True
-
-        def summary(self, input_shape: Optional[Sequence[int]] = None) -> None:
-                """Print a Keras-like model summary.
-
-                Behavior:
-                        - If an Input layer is present (anywhere, typically first), its declared
-                            shape seeds symbolic shape propagation.
-                        - If ``input_shape`` argument is provided it overrides and seeds
-                            propagation (batch dim implicit as None).
-                        - Dense layers with known input feature size (either via existing
-                            weights or explicit ``in_features`` or inferred current shape) will
-                            show concrete output shapes and parameter counts.
-                        - Dense layers without resolvable input size remain *unbuilt* until
-                            first real forward; they display output shape='?' and Param#=0.
-                        - Flatten collapses known trailing dimensions when they are all
-                            concrete; otherwise outputs '(None, ?)' until resolvable.
-
-                Args:
-                        input_shape: Optional tuple excluding batch dimension to seed shape
-                                inference when no Input layer exists.
-                """
-                # Column widths
-                col_layer = 30
-                col_shape = 28
-                header_line = "=" * (col_layer + col_shape + 11)
-                print(header_line)
-                print(f"{'Layer (type)':<{col_layer}}{'Output Shape':<{col_shape}}Param #")
-                print(header_line)
-
-                # Seed shape: from explicit arg or first Input layer
-                current_shape: Optional[Tuple[Optional[int], ...]] = None
-                if input_shape is not None:
-                        current_shape = (None,) + tuple(input_shape)
-                else:
-                        for lyr in self.layers:
-                                if isinstance(lyr, Input):
-                                        current_shape = (None,) + tuple(lyr.shape)
-                                        break
-
-                total_params = 0
-                total_tensors = 0
-
-                for layer in self.layers:
-                        display_name = self._format_layer_name(layer)
-
-                        # Unwrap for logic but keep wrapper display
-                        core = layer.layer if isinstance(layer, ActivationWrapper) else layer
-                        out_shape_str = '?'
-
-                        # Symbolic inference if we have current shape
-                        if current_shape is not None:
-                                inferred = self._infer_next_shape_symbolic(core, current_shape)
-                                if inferred is not None:
-                                        current_shape = inferred
-                                        out_shape_str = str(current_shape)
-                        else:
-                                # If layer itself provides a static output (Input)
-                                if isinstance(core, Input):
-                                        current_shape = (None,) + tuple(core.shape)
-                                        out_shape_str = str(current_shape)
-
-                        # Parameter computation (may conditionally initialize Dense if resolvable)
-                        if isinstance(core, Dense) and core.W is None and current_shape is not None:
-                                # Try build only if last dim known
-                                if len(current_shape) == 2 and current_shape[1] is not None:
-                                        core._init_params(current_shape[1])
-                                        # Refresh out shape
-                                        current_shape = (None, core.out_features)
-                                        out_shape_str = str(current_shape)
-
-                        p = layer.num_parameters()
-                        t = layer.num_parameter_tensors()
-                        total_params += p
-                        total_tensors += t
-
-                        print(f"{display_name:<{col_layer}}{out_shape_str:<{col_shape}}{p:>7}")
-
-                print(header_line)
-                print(f"Total params: {total_params}")
-                print(f"Total parameter tensors: {total_tensors}")
-                print(header_line)
+    # Removed unused _build() method from v1/v1.5 era to reduce noise and confusion.
 
     def _format_layer_name(self, layer: Layer) -> str:
         """Return a concise layer display name including activation if wrapped."""
@@ -373,7 +245,7 @@ class Sequential(Layer):
 
     def _infer_next_shape_symbolic(self, core: Layer, in_shape: tuple) -> Optional[tuple]:
         if isinstance(core, Input):
-            return (None,)+tuple(core.shape)
+            return (None,) + tuple(core.shape)
         if isinstance(core, Flatten):
             if len(in_shape) <= 2:
                 return in_shape
@@ -396,11 +268,9 @@ class Sequential(Layer):
                 core._init_params(in_shape[1])
                 return (None, core.out_features)
             return None
-        # Dropout and other shape-preserving layers
-        if core.__class__.__name__ == 'Dropout':
-            return in_shape
-        # For activation wrappers handled outside, for others unknown
-        return in_shape if isinstance(core, ActivationWrapper) else None
+        # Default: assume layers we don't explicitly handle are shape-preserving
+        # (covers Dropout and similar pass-through layers)
+        return in_shape
 
     # Added (or re-added) summary method: ensure it's defined at class scope
     def summary(self, input_shape: Optional[Sequence[int]] = None) -> None:
@@ -530,43 +400,43 @@ class Flatten(Layer):
         return []
 
 class Dropout(Layer):
-    """Randomly zero inputs during training with inverted dropout scaling.
+    """Inverted Dropout (shape-preserving, activation-noise during training only).
 
     Args:
-        rate: Probability of dropping an activation in [0, 1).
-        seed: Optional RNG seed for reproducible masks (useful in tests).
+        rate (float): Probability to drop an activation in [0, 1).
+        seed (int | None): Optional seed for reproducibility.
 
     Behavior:
-        - Training: y = x * mask / (1 - rate), mask ~ Bernoulli(1-rate)
-        - Eval: pass-through
-        - With current training loop, eval typically sets requires_grad=False;
-          we honor that by disabling dropout when x.requires_grad is False.
+        - Training: y = x * mask, where mask ~ Bernoulli(1-rate)/(1-rate)
+        - Eval: pass-through (no randomness, no scaling)
     """
 
     def __init__(self, rate: float = 0.5, seed: Optional[int] = None):
         if not (0.0 <= rate < 1.0):
             raise ValueError("Dropout rate must be in [0, 1)")
         self.rate = float(rate)
-        self.training = True  # future-proofing for model.train()/eval()
+        self.training = True
         self._seed = seed
-        self._rng = None  # lazy init to avoid importing numpy at module load
+        # Eagerly create RNG if seed provided; otherwise use global np.random
+        self._rng = None
+        if seed is not None:
+            import numpy as np  # local import
+            self._rng = np.random.default_rng(seed)
 
-    def _rng_or_np(self):
-        import numpy as np  # local import to keep module dependencies light
-        if self._rng is None and self._seed is not None:
-            self._rng = np.random.default_rng(self._seed)
-        return self._rng if self._rng is not None else np.random
+    def _random(self, shape):
+        import numpy as np
+        if self._rng is not None:
+            return self._rng.random(shape)
+        return np.random.random(shape)
 
     def forward(self, x: Tensor) -> Tensor:
-        # Disable if no dropout or in eval mode; also disable when input has no grad (evaluation path)
-        if self.rate == 0.0 or not self.training or not getattr(x, 'requires_grad', True):
+        if self.rate == 0.0 or not getattr(self, 'training', True):
             return x
         p_keep = 1.0 - self.rate
-        rng = self._rng_or_np()
-        mask = (rng.random(x.shape) < p_keep)
-        # ensure dtype matches x and keep mask out of autograd graph
-        mask = mask.astype(x.data.dtype, copy=False)
-        return x * Tensor(mask, requires_grad=False) / p_keep
+        # Pre-scale mask (0 or 1/p_keep) to avoid extra Tensor division op
+        m = (self._random(x.shape) < p_keep).astype(x.data.dtype)
+        m /= p_keep
+        return x * m
 
     def parameters(self) -> List[Tensor]:
         return []
@@ -574,44 +444,7 @@ class Dropout(Layer):
 # Optional placeholders for future convolutional/pooling layers.
 # These are provided for API completeness and can be implemented later.
 
-class Conv2D(Layer):  # pragma: no cover - placeholder
-    """2D convolution layer (placeholder).
-
-    Args:
-        filters (int): Number of output channels.
-        kernel_size (int): Kernel size (assumes square kernels).
-        input_shape (Optional[tuple]): Expected input shape (H, W, C) for first layer.
-
-    Notes:
-        This placeholder exposes parameters() and the Layer API but does not
-        implement the convolution math yet.
-    """
-
-    def __init__(self, filters: int, kernel_size: int, input_shape: Optional[tuple] = None):
-        self.filters = filters
-        self.kernel_size = kernel_size
-        self.input_shape = input_shape
-        # Parameters would be initialized lazily when implemented
-
-    def forward(self, x: Tensor) -> Tensor:
-        raise NotImplementedError("Conv2D forward is not implemented yet.")
-
-    def parameters(self) -> List[Tensor]:
-        return []
-
-
-class MaxPool2D(Layer):  # pragma: no cover - placeholder
-    """2D max pooling layer (placeholder)."""
-
-    def __init__(self, pool_size: int):
-        self.pool_size = pool_size
-
-    def forward(self, x: Tensor) -> Tensor:
-        """Apply the max pooling operation. """
-        raise NotImplementedError("MaxPool2D forward is not implemented yet.")
-
-    def parameters(self) -> List[Tensor]:
-        return []
+# Removed unimplemented Conv2D/MaxPool2D placeholders in v2 to keep API lean
 
 
 class Input(Layer):

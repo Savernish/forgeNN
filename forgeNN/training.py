@@ -19,8 +19,9 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 import numpy as np
 
-from .tensor import Tensor
-from .vectorized import cross_entropy_loss, accuracy, mse
+from .core.tensor import Tensor
+from .nn.losses import cross_entropy_loss, mse
+from .nn.metrics import accuracy
 from .optimizers import SGD, Adam, AdamW, Optimizer
 
 
@@ -50,7 +51,7 @@ class CompiledModel:
         A model with __call__(Tensor) and parameters() methods.
     optimizer: Optimizer | Dict[str, Any] | None
         If an optimizer instance is provided, it's used as-is. If a dict
-        is provided, a VectorizedOptimizer will be constructed lazily from
+    is provided, an optimizer will be constructed lazily from
         model.parameters() on first use. If None, defaults to {"lr": 0.01}.
     loss: str | Callable
         Either 'cross_entropy', 'mse', or a custom callable loss(logits, targets)->Tensor.

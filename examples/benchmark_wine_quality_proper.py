@@ -3,7 +3,7 @@
 🍷 Wine Quality Multi-Task Learning Benchmark: forgeNN vs PyTorch
 ================================================================
 
-Proper implementation using forgeNN's vectorized API correctly.
+Proper implementation using forgeNN v2 Sequential + compile/fit API.
 This benchmark demonstrates multi-task learning: regression + classification.
 
 Tasks:
@@ -214,9 +214,9 @@ def forgenn_implementation():
     import os
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     
-    # Import forgeNN properly
-    from forgeNN.tensor import Tensor
-    from forgeNN.vectorized import VectorizedMLP, VectorizedOptimizer, cross_entropy_loss, accuracy
+    # Import forgeNN v2 API
+    import forgeNN as fnn
+    from forgeNN.core.tensor import Tensor
     
     # Load and prepare data (same as PyTorch)
     wine_data = load_wine()
@@ -240,40 +240,37 @@ def forgenn_implementation():
     print(f" Dataset: {len(X_train)} train, {len(X_test)} test samples")
     print(f" Features: {X_train.shape[1]}, Classes: {len(np.unique(y_class))}")
     
-    # Create models using forgeNN's VectorizedMLP
-    regression_model = VectorizedMLP(
-        input_size=13,
-        hidden_sizes=[64, 32],
-        output_size=1,
-        activations=['relu', 'relu', 'linear']
-    )
+    # Create models using forgeNN Sequential
+    regression_model = fnn.Sequential([
+        fnn.Input((13,)),
+        fnn.Dense(64) @ 'relu',
+        fnn.Dense(32) @ 'relu',
+        fnn.Dropout(0.2),
+        fnn.Dense(1)
+    ])
+    classification_model = fnn.Sequential([
+        fnn.Input((13,)),
+        fnn.Dense(64) @ 'relu',
+        fnn.Dense(32) @ 'relu',
+        fnn.Dropout(0.2),
+        fnn.Dense(3)
+    ])
     
-    classification_model = VectorizedMLP(
-        input_size=13,
-        hidden_sizes=[64, 32], 
-        output_size=3,
-        activations=['relu', 'relu', 'linear']
-    )
-    
-    # Create optimizers properly
-    reg_optimizer = VectorizedOptimizer(regression_model.parameters(), lr=0.01, momentum=0.9)
-    clf_optimizer = VectorizedOptimizer(classification_model.parameters(), lr=0.01, momentum=0.9)
+    # Compile models
+    reg_compiled = fnn.compile(regression_model, optimizer={"type": "sgd", "momentum": 0.9}, loss='mse')
+    clf_compiled = fnn.compile(classification_model, optimizer={"type": "sgd", "momentum": 0.9}, loss='mse', metrics=['accuracy'])
     
     # Training configuration
     EPOCHS = 50
     BATCH_SIZE = 32
     
-    # Data loader helper
+    # Data loader helper (unchanged interface)
     def create_batches(X, y_class, y_qual, batch_size, shuffle=True):
-        """Create batches for training."""
-        n_samples = len(X)
-        if shuffle:
-            indices = np.random.permutation(n_samples)
-            X, y_class, y_qual = X[indices], y_class[indices], y_qual[indices]
-        
-        for i in range(0, n_samples, batch_size):
-            end_idx = min(i + batch_size, n_samples)
-            yield X[i:end_idx], y_class[i:end_idx], y_qual[i:end_idx]
+        n = len(X)
+        idx = np.random.permutation(n) if shuffle else np.arange(n)
+        for i in range(0, n, batch_size):
+            sel = idx[i:i+batch_size]
+            yield X[sel], y_class[sel], y_qual[sel]
     
     # Training metrics
     train_losses_reg = []
@@ -282,49 +279,18 @@ def forgenn_implementation():
     
     print(f"🏃 Training for {EPOCHS} epochs with batch size {BATCH_SIZE}...")
     
-    # Training loop
+    # Training loop (use compile.fit per epoch for simplicity)
     start_time = time.time()
     
     for epoch in range(EPOCHS):
         epoch_start = time.time()
+        # One epoch of training via compile.fit
+        reg_compiled.fit(X_train, y_qual_train.astype(np.float32).reshape(-1, 1), epochs=1, batch_size=BATCH_SIZE, verbose=0)
+        clf_compiled.fit(X_train, y_class_train, epochs=1, batch_size=BATCH_SIZE, verbose=0)
         
-        epoch_reg_loss = 0.0
-        epoch_clf_loss = 0.0
-        num_batches = 0
-        
-        for batch_x, batch_y_class, batch_y_qual in create_batches(X_train, y_class_train, y_qual_train, BATCH_SIZE):
-            # Convert to tensors
-            x_tensor = Tensor(batch_x)
-            y_qual_tensor = Tensor(batch_y_qual.reshape(-1, 1))  # Regression target
-            
-            # Zero gradients
-            reg_optimizer.zero_grad()
-            clf_optimizer.zero_grad()
-            
-            # Forward pass - Regression
-            reg_pred = regression_model(x_tensor)
-            reg_loss = reg_pred.mse_loss(y_qual_tensor)
-            
-            # Forward pass - Classification  
-            clf_pred = classification_model(x_tensor)
-            clf_loss = cross_entropy_loss(clf_pred, batch_y_class)
-            
-            # Backward pass
-            reg_loss.backward()
-            clf_loss.backward()
-            
-            # Update parameters
-            reg_optimizer.step()
-            clf_optimizer.step()
-            
-            # Accumulate losses
-            epoch_reg_loss += reg_loss.data.item() if hasattr(reg_loss.data, 'item') else reg_loss.data
-            epoch_clf_loss += clf_loss.data.item() if hasattr(clf_loss.data, 'item') else clf_loss.data
-            num_batches += 1
-        
-        # Record metrics
-        avg_reg_loss = epoch_reg_loss / num_batches
-        avg_clf_loss = epoch_clf_loss / num_batches
+        # Evaluate on train to log curves
+        avg_reg_loss, _ = reg_compiled.evaluate(X_train, y_qual_train.astype(np.float32).reshape(-1, 1), batch_size=BATCH_SIZE)
+        avg_clf_loss, _ = clf_compiled.evaluate(X_train, y_class_train, batch_size=BATCH_SIZE)
         epoch_time = time.time() - epoch_start
         
         train_losses_reg.append(avg_reg_loss)
@@ -337,17 +303,12 @@ def forgenn_implementation():
     total_time = time.time() - start_time
     
     # Evaluation
-    X_test_tensor = Tensor(X_test, requires_grad=False)
-    
-    # Regression evaluation
-    reg_pred_test = regression_model(X_test_tensor)
-    reg_pred_np = reg_pred_test.data.flatten()
-    reg_mse = mean_squared_error(y_qual_test, reg_pred_np)
-    reg_r2 = r2_score(y_qual_test, reg_pred_np)
-    
-    # Classification evaluation
-    clf_pred_test = classification_model(X_test_tensor)
-    clf_accuracy = accuracy(clf_pred_test, y_class_test)
+    reg_mse, _ = reg_compiled.evaluate(X_test, y_qual_test.astype(np.float32).reshape(-1, 1), batch_size=BATCH_SIZE)
+    # For R^2 we need predictions
+    reg_preds = reg_compiled.predict(X_test, batch_size=BATCH_SIZE).squeeze()
+    reg_r2 = r2_score(y_qual_test, reg_preds)
+    _, clf_metrics = clf_compiled.evaluate(X_test, y_class_test, batch_size=BATCH_SIZE)
+    clf_accuracy = clf_metrics['accuracy']
     
     print(f"\n forgeNN Results:")
     print(f"   Total time: {total_time:.3f}s")

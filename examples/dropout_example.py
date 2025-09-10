@@ -32,9 +32,9 @@ def build_models(input_dim: int = 20, lr: float = 1e-3):
     with_dropout = fnn.Sequential([
         fnn.Input((input_dim,)),
         fnn.Dense(64) @ 'relu',
-        fnn.Dropout(0.5),
-        fnn.Dense(32) @ 'relu',
         fnn.Dropout(0.3),
+        fnn.Dense(32) @ 'relu',
+        fnn.Dropout(0.2),
         fnn.Dense(3),
     ])
     with_dropout.summary((input_dim,))

@@ -1,21 +1,10 @@
 # Include documentation and configuration files
 include README.md
-include PERFORMANCE_GUIDE.md
-include ACTIVATION_GUIDE.md
-include INSTALL.md
-include DEPLOY.md
 include CHANGELOG.md
 include LICENSE
 include requirements.txt
 include pyproject.toml
 include MANIFEST.in
-
-# Include example files
-include example.py
-
-# Include build scripts
-include build_package.py
-include upload_package.py
 
 # Include all Python files in forgeNN package
 recursive-include forgeNN *.py
@@ -27,7 +16,7 @@ prune forgeNN/__pycache__
 prune forgeNN/*/__pycache__
 prune forgeNN/*/*/__pycache__
 
-# Exclude development and build files
+# Exclude development and build files and artifacts
 exclude .gitignore
 exclude .github
 recursive-exclude .github *

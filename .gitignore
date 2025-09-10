@@ -1,3 +1,6 @@
+# Removed legacy upload script in v2 cleanup
+upload_package.py
+
 # IDE
 .vscode/
 .idea/
@@ -157,24 +160,18 @@ setup.py
 pyproject.toml
 dev_check.py
 demo_comparison.py
-
+## upload_package.py removed in v2 cleanup
 # Deployment folder (personal pip deployment only)
 deployment/
 
-# Documentation files to ignore (keep only README.md and COMPARISON_GUIDE.md)
+## Docs: keep README and CHANGELOG in repo/package; ignore other markdown at root
 *.md
 !README.md
-!COMPARISON_GUIDE.md
-!SEQUENTIAL_GUIDE.md
-!TRAINING_GUIDE.md
 !CHANGELOG.md
-
-benchmark_tests/
-# Data directories (keep structure but not data)
-data/*
-!data/.gitkeep
+!ARCHITECTURE.md
 dev_examples/
 run_all_tests.py
+examples/sequential_mnist.py
 
 
 # Generated plots and outputs (keep specific important files)
