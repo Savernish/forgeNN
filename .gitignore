@@ -181,6 +181,6 @@ examples/sequential_mnist.py
 *.jpg
 *.jpeg
 *.pdf
-
+!dropout_overfitting.png
 # Project specific temporary files
 demo.ipynb
