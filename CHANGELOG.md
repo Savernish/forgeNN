@@ -6,6 +6,85 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
+## [2.0.0] - 2025-09-12 (Unreleased, current update date)
+
+### Highlights
+- V2 architecture: internal re-organization, device/runtime/backends scaffolding, and ONNX stubs. Public training API remains familiar (`Sequential`, `compile/fit/evaluate/predict`).
+
+### Added
+- New `forgeNN/nn/` package consolidating `activations`, `losses`, `metrics` and `random` with simple registries.
+- Runtime device API in `forgeNN/runtime/device.py`:
+  - `get_default_device`, `set_default_device`, `is_cuda_available`, and `use_device(...)` context manager.
+- Backends scaffold in `forgeNN/backends/`:
+  - `cpu.py` NumPy backend and `cuda.py` placeholder (optional CuPy-based; raises if CuPy missing).
+- ONNX Export – Stage 1 (MVP) complete in `forgeNN/onnx/io.py`:
+  - Export supported for Sequential MLPs with: `Input`, `Dense`→`Gemm` (auto `transB`), `Flatten`, and activations (`Relu`, `Sigmoid`, `Tanh`; optional `Softmax`).
+  - `Dropout` is folded away in eval mode (skipped during export).
+  - Default opset 13; forces IR v10 for compatibility with older onnxruntime builds.
+  - Parity verified with onnxruntime (max diff ~1e-6). TensorFlow via onnx-tf is optional and may require tensorflow-addons (Windows caveat).
+  - Import implemented (see ONNX Import – Stage 1 below).
+- ONNX Import – Stage 1 in `forgeNN/onnx/io.py`:
+  - `load_onnx(path, strict=True)` imports linear MLP graphs with `Gemm` (honors `alpha`, `beta`, `transB`), `Flatten(axis=1)`, and activations (`Relu`, `Sigmoid`, `Tanh`, `Softmax`).
+  - Skips benign `Identity`/`Dropout`. Builds a `Sequential` (adds `Input` if known), assigns `Dense` weights/biases.
+  - Strict mode raises on unsupported ops; designed for simple feed‑forward graphs.
+- Optional extras in packaging: `[onnx]`, `[cuda]`, and `[all]` in `pyproject.toml`.
+- New docs: `ARCHITECTURE.md` plus short READMEs under `runtime/`, `backends/`, and `onnx/` describing intent.
+- Examples:
+  - `examples/device_api_demo.py` showing device API usage and a quick 1-epoch run.
+  - `examples/onnx_example.py` training a small MLP, exporting to ONNX, and running it via onnxruntime (fallback) or TensorFlow (onnx-tf) with parity checks.
+  - `examples/onnx_roundtrip.py` training → export → import → parity assert and accuracy check.
+  - `examples/adam_quickstart.py` now supports live accuracy plotting during training if `matplotlib` is available (falls back to single fit otherwise).
+ - Public API ergonomics:
+   - Exposed the `nn` subpackage at top-level (`import forgeNN as fnn; fnn.nn.set_seed(...)`).
+   - RNG utilities (`forgeNN.nn.random`) simplified to manage NumPy and Python `random` states only; re-exported at `fnn.nn`.
+
+### Changed
+- Core Tensor moved to `forgeNN/core/tensor.py`. The original `forgeNN/tensor.py` now re-exports as a temporary compatibility shim.
+- All internal modules and examples updated to import `Tensor` from `forgeNN.core.tensor` (please migrate your imports accordingly).
+- `Dropout` fully rewritten with inverted scaling and clear train/eval behavior; lower overhead.
+- `ActivationWrapper` now caches/uses pre-resolved activation callables to avoid per-forward overhead.
+- Defaults aligned for smoother training parity with Keras/TensorFlow:
+  - Adam `eps=1e-7` and float32 parameter/math defaults.
+- Initialization and shapes:
+  - `Dense` uses Xavier/Glorot init; `Flatten` simplified; `Input` clarified for summary/shape seeding.
+
+### Fixed
+- Broadcasting-aware gradient reductions centralized (`_sum_to_shape`) for add/mul and friends.
+- Proper gradients for division, including right-division (`__rtruediv__`).
+- `mean.backward` supports tuple axes with correct scaling; `max.backward` stabilized for ties with epsilon.
+
+### Deprecated
+- Top-level `forgeNN/tensor.py` is a compatibility shim. It will be removed in a future release—please update imports to `forgeNN.core.tensor`.
+- `vectorized.py` kept only as a light shim; prefer `nn/` + `Sequential` path.
+
+### Removed
+- Aggressive cleanup of unused/deprecated assets: old guides, legacy scripts, and test scaffolding.
+
+### Performance
+- Small speedups from reduced activation wrapper overhead, simplified shape inference, and fused gradient reductions.
+
+### Notes
+- CUDA remains a scaffold at this time: backend is not wired to Tensor ops yet.
+- ONNX export Stage 1 (subset) and import Stage 1 (linear MLP graphs) are implemented.
+- Public API remains familiar; examples updated accordingly. A deprecation window exists for the `Tensor` import path via the shim.
+
+#### ONNX Export (Stage 1) Details
+- Scope: Sequential-only, feed-forward MLP graphs without branches.
+- Ops: `Gemm` (Dense), `Relu`/`Sigmoid`/`Tanh` (activations), `Flatten`, optional `Softmax` at the end, `Input` placeholder. `Dropout` is folded in eval and skipped.
+- Shapes: output `ValueInfo` carries symbolic batch ("N") and concrete feature dims; passes ONNX checker and shape inference.
+- Tooling: exports with opset 13; sets IR to 10 for older onnxruntime (configurable). Parity tested on Windows via onnxruntime. onnx-tf works when TensorFlow + tensorflow-addons are properly installed (Linux easiest).
+
+#### ONNX Import (Stage 1) Details
+- Scope: Linear, feed‑forward MLP graphs without branches.
+- Ops: `Gemm` with `alpha`/`beta`/`transB` handled, `Flatten(axis=1)`, activations (`Relu`, `Sigmoid`, `Tanh`, `Softmax`). `Identity` and `Dropout` are skipped.
+- Behavior: Builds a `Sequential` model (adds `Input` if shape known from model I/O), attaches activations adjacent to `Gemm`, and assigns parameters to `Dense` layers in order.
+- Example: See `examples/onnx_roundtrip.py` for export → import → parity assertion workflow.
+
+## [1.3.1] - 2025-09-13
+
+### Changed
+- Corrected the README content to accurately reflect the training API and available features.
+
 ## [1.3.0] - 2025-09-10
 
 ### Last Major Release Before 2.x Update!

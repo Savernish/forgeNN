@@ -26,16 +26,27 @@
 pip install forgeNN
 ```
 
+Optional extras:
+
+```bash
+# ONNX helpers (scaffold)
+pip install "forgeNN[onnx]"
+
+# CUDA backend (scaffold; requires compatible GPU/driver)
+pip install "forgeNN[cuda]"
+```
+
 ## Overview
 
-**forgeNN** is a modern neural network framework that is developed by a solo developer learning about ML. Features vectorized operations for high-speed training.
+**forgeNN** is a modern neural network framework with a lean v2 API focused on a clean Sequential model, fast NumPy autograd Tensor, and a Keras-like compile/fit workflow.
 
 ### Key Features
 
-- **Vectorized Operations**: NumPy-powered batch processing (100x+ speedup)
+- **Fast NumPy core**: Vectorized operations with fused, stable math
 - **Dynamic Computation Graphs**: Automatic differentiation with gradient tracking
 - **Complete Neural Networks**: From simple neurons to complex architectures
 - **Production Loss Functions**: Cross-entropy, MSE with numerical stability
+ - **Scaffolded Integrations**: Runtime device API for future CUDA; ONNX export/import stubs
 
 ## Performance vs PyTorch
 
@@ -47,7 +58,7 @@ pip install forgeNN
 | Test Accuracy | 97.30% | 97.37% | **+0.07% better** |
 | Small Models (<109k params) | Baseline | **3.52x faster** | **Massive speedup** |
 
-📊 **[See Full Comparison Guide](guides/COMPARISON_GUIDE.md)** for detailed benchmarks, syntax differences, and when to use each framework. *Note: single-machine indicative results; not statistically rigorous multi-run averages.*
+📊 Comparison and detailed docs are being refreshed for v2; see examples/ for runnable demos.
 
 
 ## Quick Start
@@ -60,28 +71,19 @@ from sklearn.datasets import make_classification
 from sklearn.preprocessing import StandardScaler
 import forgeNN as fnn
 
-# Generate dataset (reproducible)
-X, y = make_classification(
-    n_samples=1000,
-    n_features=20,
-    n_classes=3,
-    n_informative=3,
-    random_state=24
-)
-
-# Feature scaling helps optimization (especially with momentum/Adam)
+X, y = make_classification(n_samples=1000, n_features=20, n_classes=3, random_state=24)
 X = StandardScaler().fit_transform(X).astype(np.float32)
 
-# Tiny, didactic training loop (manual zero_grad/backward/step)
-model = fnn.VectorizedMLP(20, [64, 32], 3)
-optimizer = fnn.Adam(model.parameters(), lr=0.01)  # or: fnn.VectorizedOptimizer(..., momentum=0.9)
-
-for epoch in range(30):
-    logits = model(fnn.Tensor(X))
-    loss = fnn.cross_entropy_loss(logits, y)
-    optimizer.zero_grad(); loss.backward(); optimizer.step()
-    acc = fnn.accuracy(logits, y)
-    print(f"Epoch {epoch}: Loss = {loss.data:.4f}, Acc = {acc*100:.1f}%")
+model = fnn.Sequential([
+    fnn.Input((20,)),
+    fnn.Dense(64) @ 'relu',
+    fnn.Dense(32) @ 'relu',
+    fnn.Dense(3)
+])
+compiled = fnn.compile(model, optimizer={"type": "adam", "lr": 1e-3, "eps": 1e-7}, loss='cross_entropy', metrics=['accuracy'])
+compiled.fit(X, y, epochs=10, batch_size=64)
+loss, metrics = compiled.evaluate(X, y)
+print('acc', metrics['accuracy'])
 ```
 
 ### Keras-like Training (compile/fit)
@@ -110,16 +112,13 @@ loss, metrics = compiled.evaluate(X, y)
 
 ## Architecture
 
-- **Main API**: `forgeNN`, `forgeNN.Tensor`, `forgeNN.Sequential`, `forgeNN.Input`, `forgeNN.VectorizedMLP`
-- **Model Introspection**: `model.summary()` (Keras-like) with symbolic shape + parameter counts
-- **Examples**: Check `examples/` for MNIST and more
+- **Main API**: `forgeNN.Tensor`, `forgeNN.Sequential`, `forgeNN.compile`, optimizers (`SGD`, `Adam`, `AdamW`)
 
 ## Performance
 
 | Implementation | Speed | MNIST Accuracy |
 |---------------|-------|----------------|
-| Vectorized | 40,000+ samples/sec | 95%+ in <1s |
-| Sequential (with compile/fit) | 40,000+ samples/sec | 95%+ in <1.2s |
+| Sequential (compile/fit) | 40,000+ samples/sec | 95%+ in ~1s |
 
 **Highlights**:
 - **100x+ speedup** over scalar implementations
@@ -134,8 +133,7 @@ See `examples/` for full fledged demos
 ## Links
 
 - **PyPI Package**: https://pypi.org/project/forgeNN/
-- **Documentation**: See guides in this repository
-- **Guides**: SEQUENTIAL_GUIDE.md, TRAINING_GUIDE.md, COMPARISON_GUIDE.md
+- **Documentation**: v2 guides coming soon; examples in `examples/`
 - **Issues**: GitHub Issues for bug reports and feature requests
 
 ## Roadmap
@@ -144,17 +142,20 @@ See `examples/` for full fledged demos
 2. ~Dropout + LayerNorm~ 🗹 (Completed in v1.3.0)
 3. Model saving & loading (state dict + `.npz`) ☐
 4. Conv1D → Conv2D (naive) ☐
+5. Add missing tensor ops to fully support examples ☐
 5. Tiny Transformer example (encoder-only) ☐
-6. ONNX export (Sequential/Dense/Flatten/activations) then basic import (subset) ☐
-7. Documentation: serialization guide, ONNX guide, Transformer walkthrough ☐
-8. Parameter registry refinement ☐
+6. ~ONNX export (Sequential/Dense/Flatten/activations)~ 🗹 (Completed in v2.0.0)
+7. ~ONNX import (subset)~ 🗹 (Completed in v2.0.0)
+8. Basic CUDA backend (Tensor device abstraction) ☐
+9. Documentation: serialization guide, ONNX guide, Transformer walkthrough ☐
+10. Parameter registry refinement ☐
+11. CUDA / GPU backend prototype (Tensor device abstraction) ☐
 
 ### Q1 2026 (Early 2026 Targets)
-- CUDA / GPU backend prototype (Tensor device abstraction)
 - Formal architecture & design documents (graph execution, autograd internals)
 - Expanded documentation site (narrative design + performance notes)
 
-_Items above may be reprioritized based on user feedback; GPU & design docs explicitly deferred to early 2026._
+_Items above may be reprioritized based on user feedback; design docs explicitly deferred to early 2026._
 
 ## Contributing
 
