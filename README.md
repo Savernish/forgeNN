@@ -112,9 +112,7 @@ loss, metrics = compiled.evaluate(X, y)
 
 ## Architecture
 
-- **Main API**: `forgeNN.Tensor`, `forgeNN.Sequential`, `forgeNN.Input`, `forgeNN.compile`, optimizers (`SGD`, `Adam`, `AdamW`)
-- **Model Introspection**: `model.summary()` (Keras-like) with symbolic shape + parameter counts
-- **Examples**: Check `examples/` for MNIST and more
+- **Main API**: `forgeNN.Tensor`, `forgeNN.Sequential`, `forgeNN.compile`, optimizers (`SGD`, `Adam`, `AdamW`)
 
 ## Performance
 

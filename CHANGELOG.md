@@ -80,6 +80,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Behavior: Builds a `Sequential` model (adds `Input` if shape known from model I/O), attaches activations adjacent to `Gemm`, and assigns parameters to `Dense` layers in order.
 - Example: See `examples/onnx_roundtrip.py` for export → import → parity assertion workflow.
 
+## [1.3.1] - 2025-09-13
+
+### Changed
+- Corrected the README content to accurately reflect the training API and available features.
+
 ## [1.3.0] - 2025-09-10
 
 ### Last Major Release Before 2.x Update!
