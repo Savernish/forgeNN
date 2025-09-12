@@ -14,6 +14,9 @@ from .nn.metrics import accuracy
 from .runtime import get_default_device, set_default_device, is_cuda_available, use_device
 from .onnx import export_onnx, load_onnx
 
+# Expose subpackages as attributes for convenient access (e.g., fnn.nn.set_seed)
+from . import nn as nn  # noqa: F401
+
 __version__ = "2.0.0"
 __all__ = [
     'Tensor',
@@ -24,5 +27,7 @@ __all__ = [
     # runtime
     'get_default_device', 'set_default_device', 'is_cuda_available', 'use_device',
     # onnx
-    'export_onnx', 'load_onnx'
+    'export_onnx', 'load_onnx',
+    # subpackages
+    'nn',
 ]

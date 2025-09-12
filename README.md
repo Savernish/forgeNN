@@ -144,17 +144,20 @@ See `examples/` for full fledged demos
 2. ~Dropout + LayerNorm~ 🗹 (Completed in v1.3.0)
 3. Model saving & loading (state dict + `.npz`) ☐
 4. Conv1D → Conv2D (naive) ☐
+5. Add missing tensor ops to fully support examples ☐
 5. Tiny Transformer example (encoder-only) ☐
-6. ONNX export (Sequential/Dense/Flatten/activations) then basic import (subset) ☐
-7. Documentation: serialization guide, ONNX guide, Transformer walkthrough ☐
-8. Parameter registry refinement ☐
+6. ~ONNX export (Sequential/Dense/Flatten/activations)~ 🗹 (Completed in v2.0.0)
+7. ~ONNX import (subset)~ 🗹 (Completed in v2.0.0)
+8. Basic CUDA backend (Tensor device abstraction) ☐
+9. Documentation: serialization guide, ONNX guide, Transformer walkthrough ☐
+10. Parameter registry refinement ☐
+11. CUDA / GPU backend prototype (Tensor device abstraction) ☐
 
 ### Q1 2026 (Early 2026 Targets)
-- CUDA / GPU backend prototype (Tensor device abstraction)
 - Formal architecture & design documents (graph execution, autograd internals)
 - Expanded documentation site (narrative design + performance notes)
 
-_Items above may be reprioritized based on user feedback; GPU & design docs explicitly deferred to early 2026._
+_Items above may be reprioritized based on user feedback; design docs explicitly deferred to early 2026._
 
 ## Contributing
 

@@ -1,7 +1,7 @@
 """
 ONNX integration scaffolding.
 
-Public API will expose export() and load() helpers. Currently unimplemented.
+Public API will expose export() and load() helpers. Currently load is unimplemented.
 """
 
 from .io import export_onnx, load_onnx

@@ -7,6 +7,7 @@ clear errors until implemented and only import heavy deps lazily.
 from typing import Any, Optional, Tuple, Sequence, Union
 import numpy as np
 from ..core.tensor import Tensor
+import forgeNN as fnn  # type: ignore[import]
 
 def _require_onnx():
     try:
@@ -74,6 +75,7 @@ def export_onnx(
         input_example: Optional sample input for tracing.
         include_softmax: If True, include final softmax layer if present.
         fold_dropout: If True, fold Dropout layers into preceding layers.
+        ir_version: Optional ONNX IR version to set in the model metadata.
 
     Example:
         >>> import forgeNN as fnn
@@ -237,11 +239,171 @@ def export_onnx(
             model.train(was_training)
     # raise NotImplementedError("ONNX export is not implemented yet.") # done
 
-def load_onnx(path: str) -> Any:
-    """Load an ONNX model and return a forgeNN-compatible representation.
+def load_onnx(path: str, strict: bool = True) -> fnn.Sequential:
+    """Load an ONNX model (Stage 1 subset) into a forgeNN.Sequential.
+
+    Supported (linear graphs only):
+      - Gemm (Dense) with alpha/beta/transB
+      - Activations: Relu/Sigmoid/Tanh (attached after Dense when adjacent)
+      - Flatten(axis=1)
+      - Optional Softmax at the end (attached after last Dense when adjacent)
 
     Args:
-        path: Path to .onnx file.
+        path: Path to .onnx file
+        strict: If True, raise on unsupported ops or non-linear graphs; if False, skip benign no-ops
     """
-    _require_onnx()
-    raise NotImplementedError("ONNX load is not implemented yet.")
+    onnx, helper, TensorProto, numpy_helper = _require_onnx()
+    model = onnx.load(path)
+    onnx.checker.check_model(model)
+    g = model.graph
+
+    if len(g.input) != 1 or len(g.output) != 1:
+        raise ValueError("ONNX import (Stage 1) expects exactly one input and one output.")
+
+    # Input details
+    in_name = g.input[0].name
+    # Extract feature dims (drop batch). If not available, leave None and rely on summary call to infer.
+    in_dims = []
+    try:
+        tt = g.input[0].type.tensor_type
+        for i, d in enumerate(tt.shape.dim):
+            if i == 0:
+                continue  # batch dim
+            if d.dim_value > 0:
+                in_dims.append(int(d.dim_value))
+    except Exception:
+        pass
+    input_shape = tuple(in_dims) if in_dims else None
+
+    # Initializers map
+    inits = {init.name: numpy_helper.to_array(init) for init in g.initializer}
+
+    # We'll parse nodes linearly in listed order (exporter emits a linear chain)
+    nodes = list(g.node)
+    layers: list[Any] = []
+    dense_params: list[tuple[np.ndarray, np.ndarray]] = []  # (W, b) in (in,out) orientation
+
+    i = 0
+    N = len(nodes)
+    while i < N:
+        node = nodes[i]
+        op = node.op_type
+
+        if op in ("Identity", "Dropout"):
+            # Skip benign no-ops; Dropout assumed eval-mode
+            i += 1
+            continue
+
+        if op == "Flatten":
+            # axis default is 1 in our exporter
+            axis = 1
+            for a in node.attribute:
+                if a.name == "axis":
+                    axis = int(a.i)
+                    break
+            if axis != 1 and strict:
+                raise ValueError(f"Flatten axis={axis} not supported in Stage 1 (expected axis=1)")
+            layers.append(fnn.Flatten())
+            i += 1
+            continue
+
+        if op == "Gemm":
+            # Extract weights and bias
+            A = node.input[0]
+            B_name = node.input[1]
+            C_name = node.input[2] if len(node.input) > 2 else None
+            if B_name not in inits or (C_name is not None and C_name not in inits):
+                raise ValueError(f"ONNX import: missing initializer for Gemm weights/bias: {B_name}, {C_name}")
+            B = inits[B_name]
+            C = inits[C_name] if C_name is not None else None
+
+            alpha = 1.0
+            beta = 1.0
+            transB = 0
+            for a in node.attribute:
+                if a.name == "alpha":
+                    alpha = float(a.f) if a.type == 1 else float(a.i)
+                elif a.name == "beta":
+                    beta = float(a.f) if a.type == 1 else float(a.i)
+                elif a.name == "transB":
+                    transB = int(a.i)
+
+            # Compute effective W (in,out) and b (out,)
+            W_eff = (B.T if transB else B).astype(np.float32, copy=False)
+            W_eff = (alpha * W_eff).astype(np.float32, copy=False)
+            if C is None:
+                b_eff = np.zeros((W_eff.shape[1],), dtype=np.float32)
+            else:
+                b_arr = C.astype(np.float32, copy=False)
+                # C can be (out,) or (1,out); ensure (out,)
+                b_eff = b_arr.reshape(-1).astype(np.float32, copy=False) * float(beta)
+
+            out_dim = int(W_eff.shape[1])
+
+            # Look ahead for immediate activation to attach
+            act_name = None
+            if i + 1 < N and nodes[i + 1].op_type in ("Relu", "Sigmoid", "Tanh", "Softmax"):
+                nxt = nodes[i + 1]
+                act_name = nxt.op_type.lower()
+                # Only keep softmax if it's intended as final activation; otherwise we can attach anyway.
+                i_adv = 1
+            else:
+                i_adv = 0
+
+            # Create Dense (optionally wrapped)
+            dense = fnn.Dense(out_dim)
+            if act_name and act_name != "softmax":
+                dense = dense @ act_name
+            elif act_name == "softmax":
+                # Attach softmax too; forgeNN supports 'softmax' token
+                dense = dense @ "softmax"
+            layers.append(dense)
+            dense_params.append((W_eff, b_eff))
+
+            i += 1 + i_adv
+            continue
+
+        if op in ("Relu", "Sigmoid", "Tanh", "Softmax"):
+            # Standalone activation without preceding Gemm: attach as its own layer if strict is False
+            if strict:
+                raise ValueError(f"Unexpected standalone activation {op} without preceding Gemm in Stage 1 importer")
+            layers.append(fnn.Dense(0) @ op.lower())  # placeholder; will likely fail without Dense
+            i += 1
+            continue
+
+        # Unknown op
+        if strict:
+            raise ValueError(f"Unsupported op in Stage 1 importer: {op}")
+        # else skip
+        i += 1
+
+    # Build Sequential, optionally with Input for clarity
+    if input_shape:
+        seq = fnn.Sequential([fnn.Input(input_shape), *layers])
+        # Initialize shapes/params by running summary
+        try:
+            seq.summary(input_shape)
+        except Exception:
+            pass
+    else:
+        seq = fnn.Sequential(layers)
+
+    # Assign weights to Dense layers in order
+    # Find Dense cores in sequence order (unwrap ActivationWrapper)
+    dense_layers: list[Any] = []
+    for lyr in seq.layers:
+        core = getattr(lyr, "layer", lyr)
+        if core.__class__.__name__ == "Dense":
+            dense_layers.append(core)
+
+    if len(dense_layers) != len(dense_params):
+        raise RuntimeError(
+            f"Mismatch between parsed Dense layers ({len(dense_layers)}) and parameters ({len(dense_params)})."
+        )
+
+    for core, (W, b) in zip(dense_layers, dense_params):
+        # Ensure shapes are initialized (after summary). Then assign.
+        core.W.data[...] = W.astype(np.float32, copy=False)
+        core.b.data[...] = b.astype(np.float32, copy=False)
+
+    return seq

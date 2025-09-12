@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
-## [2.0.0] - 2025-09-11(Unreleased, current update date)
+## [2.0.0] - 2025-09-12 (Unreleased, current update date)
 
 ### Highlights
 - V2 architecture: internal re-organization, device/runtime/backends scaffolding, and ONNX stubs. Public training API remains familiar (`Sequential`, `compile/fit/evaluate/predict`).
@@ -22,12 +22,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `Dropout` is folded away in eval mode (skipped during export).
   - Default opset 13; forces IR v10 for compatibility with older onnxruntime builds.
   - Parity verified with onnxruntime (max diff ~1e-6). TensorFlow via onnx-tf is optional and may require tensorflow-addons (Windows caveat).
-  - Import remains TODO (`load_onnx` still raises `NotImplementedError`).
+  - Import implemented (see ONNX Import – Stage 1 below).
+- ONNX Import – Stage 1 in `forgeNN/onnx/io.py`:
+  - `load_onnx(path, strict=True)` imports linear MLP graphs with `Gemm` (honors `alpha`, `beta`, `transB`), `Flatten(axis=1)`, and activations (`Relu`, `Sigmoid`, `Tanh`, `Softmax`).
+  - Skips benign `Identity`/`Dropout`. Builds a `Sequential` (adds `Input` if known), assigns `Dense` weights/biases.
+  - Strict mode raises on unsupported ops; designed for simple feed‑forward graphs.
 - Optional extras in packaging: `[onnx]`, `[cuda]`, and `[all]` in `pyproject.toml`.
 - New docs: `ARCHITECTURE.md` plus short READMEs under `runtime/`, `backends/`, and `onnx/` describing intent.
 - Examples:
   - `examples/device_api_demo.py` showing device API usage and a quick 1-epoch run.
   - `examples/onnx_example.py` training a small MLP, exporting to ONNX, and running it via onnxruntime (fallback) or TensorFlow (onnx-tf) with parity checks.
+  - `examples/onnx_roundtrip.py` training → export → import → parity assert and accuracy check.
+  - `examples/adam_quickstart.py` now supports live accuracy plotting during training if `matplotlib` is available (falls back to single fit otherwise).
+ - Public API ergonomics:
+   - Exposed the `nn` subpackage at top-level (`import forgeNN as fnn; fnn.nn.set_seed(...)`).
+   - RNG utilities (`forgeNN.nn.random`) simplified to manage NumPy and Python `random` states only; re-exported at `fnn.nn`.
 
 ### Changed
 - Core Tensor moved to `forgeNN/core/tensor.py`. The original `forgeNN/tensor.py` now re-exports as a temporary compatibility shim.
@@ -56,7 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 - CUDA remains a scaffold at this time: backend is not wired to Tensor ops yet.
-- ONNX export Stage 1 (subset) is implemented; ONNX import is not implemented yet and will raise `NotImplementedError`.
+- ONNX export Stage 1 (subset) and import Stage 1 (linear MLP graphs) are implemented.
 - Public API remains familiar; examples updated accordingly. A deprecation window exists for the `Tensor` import path via the shim.
 
 #### ONNX Export (Stage 1) Details
@@ -64,6 +73,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ops: `Gemm` (Dense), `Relu`/`Sigmoid`/`Tanh` (activations), `Flatten`, optional `Softmax` at the end, `Input` placeholder. `Dropout` is folded in eval and skipped.
 - Shapes: output `ValueInfo` carries symbolic batch ("N") and concrete feature dims; passes ONNX checker and shape inference.
 - Tooling: exports with opset 13; sets IR to 10 for older onnxruntime (configurable). Parity tested on Windows via onnxruntime. onnx-tf works when TensorFlow + tensorflow-addons are properly installed (Linux easiest).
+
+#### ONNX Import (Stage 1) Details
+- Scope: Linear, feed‑forward MLP graphs without branches.
+- Ops: `Gemm` with `alpha`/`beta`/`transB` handled, `Flatten(axis=1)`, activations (`Relu`, `Sigmoid`, `Tanh`, `Softmax`). `Identity` and `Dropout` are skipped.
+- Behavior: Builds a `Sequential` model (adds `Input` if shape known from model I/O), attaches activations adjacent to `Gemm`, and assigns parameters to `Dense` layers in order.
+- Example: See `examples/onnx_roundtrip.py` for export → import → parity assertion workflow.
 
 ## [1.3.0] - 2025-09-10
 
