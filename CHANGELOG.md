@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - V2 architecture: internal re-organization, device/runtime/backends scaffolding, and ONNX stubs. Public training API remains familiar (`Sequential`, `compile/fit/evaluate/predict`).
 
 ### Added
-- New `forgeNN/nn/` package consolidating `activations`, `losses`, and `metrics` with simple registries.
+- New `forgeNN/nn/` package consolidating `activations`, `losses`, `metrics` and `random` with simple registries.
 - Runtime device API in `forgeNN/runtime/device.py`:
   - `get_default_device`, `set_default_device`, `is_cuda_available`, and `use_device(...)` context manager.
 - Backends scaffold in `forgeNN/backends/`:
