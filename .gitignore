@@ -169,6 +169,7 @@ deployment/
 !README.md
 !CHANGELOG.md
 !ARCHITECTURE.md
+!examples/embedding_layernorm_text_classification.md
 dev_examples/
 run_all_tests.py
 examples/sequential_mnist.py

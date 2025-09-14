@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
-## [2.0.0] - 2025-09-12 (Unreleased, current update date)
+## [2.0.0] - 2025-09-13 (Unreleased, current update date)
 
 ### Highlights
 - V2 architecture: internal re-organization, device/runtime/backends scaffolding, and ONNX stubs. Public training API remains familiar (`Sequential`, `compile/fit/evaluate/predict`).
@@ -34,9 +34,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `examples/onnx_example.py` training a small MLP, exporting to ONNX, and running it via onnxruntime (fallback) or TensorFlow (onnx-tf) with parity checks.
   - `examples/onnx_roundtrip.py` training → export → import → parity assert and accuracy check.
   - `examples/adam_quickstart.py` now supports live accuracy plotting during training if `matplotlib` is available (falls back to single fit otherwise).
+ - Module-level convenience API:
+   - `forgeNN.randint(low, high, size)` returns a NumPy `ndarray` of dtype `int64` for fast dataset indexing (not a `Tensor`).
+   - `forgeNN.stack(list, axis=0)` stacks Tensors or array-like values into a new `Tensor`; gradients propagate only into Tensor inputs.
+ - Tensor ergonomics:
+   - NumPy-style indexing and slicing via `Tensor.__getitem__` with correct gradient scatter-back into the sliced region.
+   - `Tensor.tolist()` helper for readable printing (returns a Python scalar for 0-D tensors).
  - Public API ergonomics:
    - Exposed the `nn` subpackage at top-level (`import forgeNN as fnn; fnn.nn.set_seed(...)`).
    - RNG utilities (`forgeNN.nn.random`) simplified to manage NumPy and Python `random` states only; re-exported at `fnn.nn`.
+ - New Layers - foundational building blocks for upcoming Transformer support:
+   - `Embedding(vocab_size, embedding_dim, padding_idx=None)`: vector lookup with correct gradient accumulation via `np.add.at`; supports optional frozen padding row.
+   - `LayerNorm(normalized_shape=None, eps=1e-5)`: last-dim normalization with learnable affine parameters (gamma/beta) and lazy init.
+   - `GlobalAvgPool1D(keepdims=False)` and `GlobalAvgPool2D(keepdims=False)`: reduction over temporal/spatial dims using Tensor.mean; integrates with `Sequential.summary()`.
+ - Examples:
+   - `examples/embedding_layernorm_text_classification.py`: fastText-style classifier showing Embedding → GlobalAvgPool1D → LayerNorm → Dropout → Dense on a synthetic dataset.
+   - `examples/embedding_layernorm_text_classification.md`: step-by-step README explaining data generation, model, training, troubleshooting, and extensions.
 
 ### Changed
 - Core Tensor moved to `forgeNN/core/tensor.py`. The original `forgeNN/tensor.py` now re-exports as a temporary compatibility shim.
@@ -47,15 +60,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Adam `eps=1e-7` and float32 parameter/math defaults.
 - Initialization and shapes:
   - `Dense` uses Xavier/Glorot init; `Flatten` simplified; `Input` clarified for summary/shape seeding.
+ - Public API ergonomics (cont.):
+   - `randint`/`stack` are now available at the top level (`import forgeNN as fnn; fnn.randint(...), fnn.stack(...)`).
+   - `forgeNN.randint` intentionally returns a NumPy array (indices), while `forgeNN.stack` accepts both Tensors and array-likes and returns a `Tensor`.
+ - Layer naming consistency: renamed placeholders `Convo1D/Convo2D` to `Conv1D/Conv2D`.
+ - Top-level exports: added `Embedding`, `LayerNorm`, `GlobalAvgPool1D`, and `GlobalAvgPool2D` to `forgeNN.__init__` for direct import.
+ - `Sequential.summary()` shape inference enhanced to recognize GlobalAvgPool layers (handles keepdims output forms) and Embedding (appends `embedding_dim`).
 
 ### Fixed
 - Broadcasting-aware gradient reductions centralized (`_sum_to_shape`) for add/mul and friends.
 - Proper gradients for division, including right-division (`__rtruediv__`).
 - `mean.backward` supports tuple axes with correct scaling; `max.backward` stabilized for ties with epsilon.
+ - Example compatibility: `examples/transformer/gpt.py` now runs end-to-end. Resolved earlier errors by introducing `Tensor` slicing support and aligning `randint` (returns indices array) and `stack` semantics.
+ - Prevented import-time crashes from unimplemented layer stubs (Conv/Pool/BatchNorm) by moving `NotImplementedError` to `__init__/forward` instead of class body scope.
 
 ### Deprecated
 - Top-level `forgeNN/tensor.py` is a compatibility shim. It will be removed in a future release—please update imports to `forgeNN.core.tensor`.
 - `vectorized.py` kept only as a light shim; prefer `nn/` + `Sequential` path.
+ - `Tensor.stack(...)` and `Tensor.randint(...)` are deprecated in favor of the module-level `forgeNN.stack` and `forgeNN.randint` (emit `DeprecationWarning`; shims forward to the new APIs).
 
 ### Removed
 - Aggressive cleanup of unused/deprecated assets: old guides, legacy scripts, and test scaffolding.

@@ -22,6 +22,7 @@ from typing import Callable, Iterable, List, Optional, Sequence, Union, Tuple
 
 from .core.tensor import Tensor
 from .nn.activations import ACTIVATION_FUNCTIONS  # v2 unified activation mapping
+import numpy as np
 
 
 ActivationType = Union[str, type, Callable[[Tensor], Tensor]]
@@ -318,6 +319,23 @@ class Sequential(Layer):
                     current_shape = (None, core.out_features)
                     shape_str = str(current_shape)
 
+            if isinstance(core, GlobalAvgPool2D):
+                if current_shape is not None and len(current_shape) == 4:
+                    C = current_shape[1]
+                    current_shape = (None, C, 1, 1) if getattr(core, "keepdims", False) else (None, C)
+                    shape_str = str(current_shape)
+
+            if isinstance(core, GlobalAvgPool1D):
+                if current_shape is not None and len(current_shape) == 3:
+                    C = current_shape[1]
+                    current_shape = (None, C, 1) if getattr(core, "keepdims", False) else (None, C)
+                    shape_str = str(current_shape)
+
+            if isinstance(core, Embedding):
+                if current_shape is not None:
+                    current_shape = current_shape + (core.embedding_dim,)
+                    shape_str = str(current_shape)
+
             p = layer.num_parameters()
             t = layer.num_parameter_tensors()
             total_params += p
@@ -356,7 +374,6 @@ class Dense(Layer):
 
     def _init_params(self, in_features: int) -> None:
         """Initialize weights with Xavier/Glorot uniform and zero bias."""
-        import numpy as np
         fan_in, fan_out = in_features, self.out_features
         limit = float(np.sqrt(6.0 / (fan_in + fan_out)))
         self.W = Tensor(
@@ -440,12 +457,71 @@ class Dropout(Layer):
 
     def parameters(self) -> List[Tensor]:
         return []
+    
+class Embedding(Layer):
+    """Embedding layer mapping discrete indices to dense vectors.
 
-# Optional placeholders for future convolutional/pooling layers.
-# These are provided for API completeness and can be implemented later.
+    Args:
+        num_embeddings (int): Size of the vocabulary (number of unique indices).
+        embedding_dim (int): Dimensionality of each embedding vector.
+        padding_idx (int | None): If set, the embedding at this index is initialized
+            to zeros and its gradient is kept zeroed.
 
-# Removed unimplemented Conv2D/MaxPool2D placeholders in v2 to keep API lean
+    Notes:
+        - Input x should contain integer indices (Tensor or array-like).
+        - Output shape is x.shape + (embedding_dim,).
+        - Gradients accumulate correctly even when indices repeat in a batch.
+    """
 
+    def __init__(self, num_embeddings: int, embedding_dim: int, padding_idx: Optional[int] = None):
+        if num_embeddings <= 0 or embedding_dim <= 0:
+            raise ValueError("num_embeddings and embedding_dim must be positive integers")
+
+        self.num_embeddings = int(num_embeddings)
+        self.embedding_dim = int(embedding_dim)
+        self.padding_idx = padding_idx if padding_idx is not None else None
+
+        # Initialize weights (normal with small std, similar to transformer defaults)
+        W = np.random.normal(loc=0.0, scale=0.02, size=(self.num_embeddings, self.embedding_dim)).astype(np.float32)
+        if self.padding_idx is not None:
+            if not (0 <= self.padding_idx < self.num_embeddings):
+                raise ValueError(f"padding_idx {self.padding_idx} out of range [0, {self.num_embeddings})")
+            W[self.padding_idx].fill(0.0)
+
+        self.W = Tensor(W, requires_grad=True)
+        
+    def forward(self, x: Union[Tensor, list, tuple]) -> Tensor:
+        # Get integer indices as NumPy array
+        if isinstance(x, Tensor):
+            idx = x.data.astype(np.int64, copy=False)
+        else:
+            idx = np.asarray(x, dtype=np.int64)
+
+        if idx.size > 0:
+            if (idx < 0).any() or (idx >= self.num_embeddings).any():
+                raise IndexError("Embedding indices are out of range")
+
+        # Advanced indexing: shape -> idx.shape + (embedding_dim,)
+        out_data = self.W.data[idx]
+
+        # Build output tensor that depends on self.W; gradient flows into W only
+        out = Tensor(out_data, requires_grad=self.W.requires_grad, _children=(self.W,), _op="embedding")
+
+        def _backward():
+            if not self.W.requires_grad:
+                return
+            grad = out.grad  # shape idx.shape + (embedding_dim,)
+            flat_idx = idx.reshape(-1)
+            flat_grad = grad.reshape(-1, self.embedding_dim)
+            np.add.at(self.W.grad, flat_idx, flat_grad)
+            if self.padding_idx is not None:
+                self.W.grad[self.padding_idx, :].fill(0.0)
+
+        out._backward = _backward
+        return out
+
+    def parameters(self) -> List[Tensor]:
+        return [self.W]
 
 class Input(Layer):
     """Input placeholder layer defining the expected input shape (excluding batch).
@@ -471,4 +547,163 @@ class Input(Layer):
         return x
 
     def parameters(self) -> List[Tensor]:  # no params
+        return []
+
+class GlobalAvgPool2D(Layer):
+    """Global average pooling over spatial dims (H, W) for NCHW input."""
+    def __init__(self, keepdims: bool = False):
+        self.keepdims = bool(keepdims)
+
+    def forward(self, x: Tensor) -> Tensor:
+        if len(x.shape) != 4:
+            raise ValueError("GlobalAvgPool2D expects input of shape (N, C, H, W)")
+        return x.mean(axis=(2, 3), keepdims=self.keepdims)
+
+    def parameters(self) -> List[Tensor]:
+        return []
+    
+class GlobalAvgPool1D(Layer):
+    """Global average pooling over temporal dim (L) for NCL input."""
+    def __init__(self, keepdims: bool = False):
+        self.keepdims = bool(keepdims)
+
+    def forward(self, x: Tensor) -> Tensor:
+        if len(x.shape) != 3:
+            raise ValueError("GlobalAvgPool1D expects input of shape (N, C, L)")
+        return x.mean(axis=2, keepdims=self.keepdims)
+
+    def parameters(self) -> List[Tensor]:
+        return []
+
+class LayerNorm(Layer):
+    """Layer normalization over the last dimension.
+    Args:
+        normalized_shape (int | None): Size of the last dimension to normalize.
+            If None, will be lazily initialized on first forward pass.
+        eps (float): Small constant for numerical stability.
+    Examples:
+        >>> ln = LayerNorm(4)
+        >>> x = Tensor([[1., 2., 3., 4.], [ 5., 6., 7., 8.]])
+        >>> y = ln(x)   # shape (2, 4)
+        >>> y.shape
+        (2, 4)
+    """
+
+    def __init__(self, normalized_shape: Optional[int] = None, eps: float = 1e-5):
+        self.eps = float(eps)
+        self._dim = int(normalized_shape) if normalized_shape is not None else None
+        self.gamma: Optional[Tensor] = None
+        self.beta: Optional[Tensor] = None
+        if self._dim is not None:
+            self._init_params(self._dim)
+
+    def _init_params(self, d: int) -> None:
+        self.gamma = Tensor(np.ones(d, dtype=np.float32), requires_grad=True)
+        self.beta = Tensor(np.zeros(d, dtype=np.float32), requires_grad=True)
+        self._dim = d
+
+    def forward(self, x: Tensor) -> Tensor:
+        # Lazy init based on trailing dimension
+        d = x.shape[-1]
+        if self._dim is None:
+            self._init_params(d)
+        elif self._dim != d:
+            raise ValueError(f"LayerNorm expected last dim {self._dim}, got {d}")
+
+        # Compute mean/var along last dim using Tensor ops (autodiff-friendly)
+        mu = x.mean(axis=-1, keepdims=True)
+        var = ((x - mu) * (x - mu)).mean(axis=-1, keepdims=True)
+        norm = (x - mu) / (var + self.eps) ** 0.5  # sqrt via pow
+
+        # Affine transform (broadcast gamma/beta)
+        y = norm * self.gamma + self.beta
+        return y
+
+    def parameters(self) -> List[Tensor]:
+        return [p for p in (self.gamma, self.beta) if p is not None]
+
+class Conv2D(Layer):
+    """Placeholder for 2D convolution (not implemented yet)."""
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError("Conv2D is not implemented yet")
+
+    def forward(self, x: Tensor) -> Tensor:  # pragma: no cover
+        raise NotImplementedError("Conv2D is not implemented yet")
+
+    def parameters(self) -> List[Tensor]:
+        return []
+
+class MaxPool2D(Layer):
+    """Placeholder for 2D max pooling (not implemented yet)."""
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError("MaxPool2D is not implemented yet")
+
+    def forward(self, x: Tensor) -> Tensor:  # pragma: no cover
+        raise NotImplementedError("MaxPool2D is not implemented yet")
+
+    def parameters(self) -> List[Tensor]:
+        return []
+class AvgPool2D(Layer):
+    """Placeholder for 2D average pooling (not implemented yet)."""
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError("AvgPool2D is not implemented yet")
+
+    def forward(self, x: Tensor) -> Tensor:  # pragma: no cover
+        raise NotImplementedError("AvgPool2D is not implemented yet")
+
+    def parameters(self) -> List[Tensor]:
+        return []
+
+class Conv1D(Layer):
+    """Placeholder for 1D convolution (not implemented yet)."""
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError("Conv1D is not implemented yet")
+
+    def forward(self, x: Tensor) -> Tensor:  # pragma: no cover
+        raise NotImplementedError("Conv1D is not implemented yet")
+
+    def parameters(self) -> List[Tensor]:
+        return []
+
+class MaxPool1D(Layer):
+    """Placeholder for 1D max pooling (not implemented yet)."""
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError("MaxPool1D is not implemented yet")
+
+    def forward(self, x: Tensor) -> Tensor:  # pragma: no cover
+        raise NotImplementedError("MaxPool1D is not implemented yet")
+
+    def parameters(self) -> List[Tensor]:
+        return []
+class AvgPool1D(Layer):
+    """Placeholder for 1D average pooling (not implemented yet)."""
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError("AvgPool1D is not implemented yet")
+
+    def forward(self, x: Tensor) -> Tensor:  # pragma: no cover
+        raise NotImplementedError("AvgPool1D is not implemented yet")
+
+    def parameters(self) -> List[Tensor]:
+        return []
+
+class BatchNorm1D(Layer):
+    """Placeholder for 1D batch normalization (not implemented yet)."""
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError("BatchNorm1D is not implemented yet")
+
+    def forward(self, x: Tensor) -> Tensor:  # pragma: no cover
+        raise NotImplementedError("BatchNorm1D is not implemented yet")
+
+    def parameters(self) -> List[Tensor]:
+        return []
+
+class BatchNorm2D(Layer):
+    """Placeholder for 2D batch normalization (not implemented yet)."""
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError("BatchNorm2D is not implemented yet")
+
+    def forward(self, x: Tensor) -> Tensor:  # pragma: no cover
+        raise NotImplementedError("BatchNorm2D is not implemented yet")
+
+    def parameters(self) -> List[Tensor]:
         return []

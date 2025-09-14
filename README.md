@@ -63,29 +63,6 @@ pip install "forgeNN[cuda]"
 
 ## Quick Start
 
-### High-Performance Training
-
-```python
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.preprocessing import StandardScaler
-import forgeNN as fnn
-
-X, y = make_classification(n_samples=1000, n_features=20, n_classes=3, random_state=24)
-X = StandardScaler().fit_transform(X).astype(np.float32)
-
-model = fnn.Sequential([
-    fnn.Input((20,)),
-    fnn.Dense(64) @ 'relu',
-    fnn.Dense(32) @ 'relu',
-    fnn.Dense(3)
-])
-compiled = fnn.compile(model, optimizer={"type": "adam", "lr": 1e-3, "eps": 1e-7}, loss='cross_entropy', metrics=['accuracy'])
-compiled.fit(X, y, epochs=10, batch_size=64)
-loss, metrics = compiled.evaluate(X, y)
-print('acc', metrics['accuracy'])
-```
-
 ### Keras-like Training (compile/fit)
 
 ```python

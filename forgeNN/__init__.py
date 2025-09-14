@@ -6,7 +6,8 @@ Lean public API with stable, documented entry points. Docstrings preserved.
 """
 
 from .core.tensor import Tensor
-from .layers import Layer, ActivationWrapper, Sequential, Dense, Flatten, Input, Dropout
+from .core.tensor import randint, stack
+from .layers import Layer, ActivationWrapper, Sequential, Dense, Flatten, Input, Dropout, GlobalAvgPool1D, GlobalAvgPool2D, Embedding, LayerNorm
 from .optimizers import Optimizer, SGD, Adam, AdamW
 from .training import compile
 from .nn.losses import cross_entropy_loss
@@ -19,8 +20,9 @@ from . import nn as nn  # noqa: F401
 
 __version__ = "2.0.0"
 __all__ = [
-    'Tensor',
+    'Tensor', 'randint', 'stack',
     'Layer', 'ActivationWrapper', 'Sequential', 'Dense', 'Flatten', 'Input', 'Dropout',
+    'GlobalAvgPool1D', 'GlobalAvgPool2D', 'Embedding', 'LayerNorm',
     'Optimizer', 'SGD', 'Adam', 'AdamW',
     'compile',
     'cross_entropy_loss', 'accuracy',

@@ -5,6 +5,7 @@ This is the primary vectorized autodiff engine for forgeNN.
 """
 
 import numpy as np
+import warnings
 from typing import Union, List, Tuple, Optional
 
 class Tensor:
@@ -76,6 +77,28 @@ class Tensor:
 	def __repr__(self):
 		"""Return a concise representation including shape and grad flag."""
 		return f"Tensor(shape={self.shape}, requires_grad={self.requires_grad})"
+
+	def __getitem__(self, idx):
+		"""Support NumPy-style indexing and slicing.
+
+		Returns a Tensor view/slice. Gradient is scattered back into the
+		sliced region of the parent during backprop.
+		"""
+		out_data = self.data[idx]
+		out = Tensor(out_data, requires_grad=self.requires_grad,
+					_children=(self,), _op='slice')
+
+		def _backward():
+			if self.requires_grad:
+				# Accumulate gradient into the sliced region
+				self.grad[idx] += out.grad
+
+		out._backward = _backward
+		return out
+
+	def tolist(self):
+		"""Return the underlying data as a (nested) Python list."""
+		return self.data.tolist()
     
 	def __add__(self, other):
 		"""Vectorized addition with NumPy-style broadcasting.
@@ -320,6 +343,34 @@ class Tensor:
 				other.grad += self.data * out.grad
 		out._backward = _backward
 		return out
+
+	@staticmethod
+	def stack(tensors: List['Tensor'], axis: int = 0) -> 'Tensor':
+		"""[DEPRECATED] Use forgeNN.stack instead.
+
+		This staticmethod forwards to the module-level stack() to preserve
+		backward compatibility for a couple of releases.
+		"""
+		warnings.warn(
+			"Tensor.stack is deprecated; use forgeNN.stack or forgeNN.core.tensor.stack",
+			DeprecationWarning,
+			stacklevel=2,
+		)
+		return stack(tensors, axis=axis)
+
+	@staticmethod
+	def randint(low: int, high: int, size: Tuple[int, ...], requires_grad: bool = False) -> 'Tensor':
+		"""[DEPRECATED] Use forgeNN.randint instead.
+
+		This staticmethod forwards to the module-level randint() to preserve
+		backward compatibility for a couple of releases.
+		"""
+		warnings.warn(
+			"Tensor.randint is deprecated; use forgeNN.randint or forgeNN.core.tensor.randint",
+			DeprecationWarning,
+			stacklevel=2,
+		)
+		return randint(low, high, size=size, requires_grad=requires_grad)
 
 	def reshape(self, *new_shape) -> 'Tensor':   
 		"""Reshape tensor to new shape."""
@@ -645,4 +696,59 @@ class Tensor:
         
 		out._backward = _backward
 		return out
+
+# -----------------------------
+# Module-level convenience API
+# -----------------------------
+
+def randint(low: int, high: int, size: Tuple[int, ...]) -> np.ndarray:
+	"""Return random integers in [low, high) as a NumPy array.
+
+	This is intended for indexing/sampling (e.g., creating mini-batch indices).
+	It returns a plain NumPy array (dtype=int64) for direct use in slicing.
+
+	Args:
+		low: Inclusive lower bound.
+		high: Exclusive upper bound.
+		size: Output shape tuple.
+
+	Returns:
+		ndarray: Array of shape `size` with integer values in [low, high).
+	"""
+	return np.random.randint(low, high, size=size, dtype=np.int64)
+
+
+def stack(tensors: List[Union[Tensor, np.ndarray, list]], axis: int = 0) -> Tensor:
+	"""Stack a sequence of Tensors or array-likes along a new axis.
+
+	Args:
+		tensors: List of Tensor or array-like objects with the same shape.
+		axis: Axis along which to stack (default: 0).
+
+	Returns:
+		Tensor: Stacked tensor with one extra dimension at `axis`.
+	"""
+	if len(tensors) == 0:
+		raise ValueError("stack() expects a non-empty list")
+	# Normalize inputs to numpy arrays for stacking
+	data_list = [t.data if isinstance(t, Tensor) else np.array(t) for t in tensors]
+	out_data = np.stack(data_list, axis=axis)
+	requires_grad = any((t.requires_grad if isinstance(t, Tensor) else False) for t in tensors)
+	children = tuple(t for t in tensors if isinstance(t, Tensor))
+	out = Tensor(out_data, requires_grad=requires_grad,
+			  _children=children, _op=f'stack(axis={axis})')
+
+	def _backward():
+		# Distribute gradient slices back to Tensor inputs along the stacking axis
+		if not requires_grad:
+			return
+		for i, t in enumerate(tensors):
+			if not isinstance(t, Tensor) or not t.requires_grad:
+				continue
+			index = [slice(None)] * out.grad.ndim
+			index[axis] = i
+			t.grad += out.grad[tuple(index)]
+
+	out._backward = _backward
+	return out
 
