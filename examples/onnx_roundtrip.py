@@ -40,10 +40,10 @@ def main():
         fnn.Dense(args.classes),  # logits
     ])
     model.summary((args.in_dim,))
-
+    opt = fnn.Adam(lr=args.lr)
     compiled = fnn.compile(
         model,
-        optimizer={"type": "adam", "lr": args.lr, "eps": 1e-7},
+        optimizer=opt,
         loss="cross_entropy",
         metrics=["accuracy"],
     )

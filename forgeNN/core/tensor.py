@@ -161,33 +161,31 @@ class Tensor:
 		return out
     
 	def __matmul__(self, other):
-		"""Matrix multiplication (batch-aware).
+		"""Generalized matrix multiplication with broadcasting (NumPy semantics).
 
-		Shapes follow NumPy's @ operator: (N, D) @ (D, M) -> (N, M).
-
-		Args:
-			other (Tensor | array-like): Right-hand matrix.
-
-		Returns:
-			Tensor: Product tensor.
-
-		Example:
-			>>> X = Tensor([[1., 2.], [3., 4.]])
-			>>> W = Tensor([[5., 6.], [7., 8.]])
-			>>> (X @ W).shape
-			(2, 2)
+		Supports N-D batched matmul: (..., m, k) @ (..., k, n) -> (..., m, n)
+		with NumPy broadcasting on leading dimensions.
 		"""
 		other = self._ensure_tensor(other)
-		out_data = self.data @ other.data
+		A = self.data
+		B = other.data
+		out_data = np.matmul(A, B)
 		out = Tensor(out_data, requires_grad=self.requires_grad or other.requires_grad,
 					_children=(self, other), _op='@')
-        
+
 		def _backward():
+			dY = out.grad
+			# Gradients w.r.t A and B follow batched matmul rules:
+			# dA = dY @ B^T, dB = A^T @ dY with proper broadcasting; then reduce to original shapes
 			if self.requires_grad:
-				self.grad += out.grad @ other.data.T
+				# Compute full gradient in broadcasted shape
+				grad_A_full = np.matmul(dY, np.swapaxes(B, -1, -2))
+				# Reduce to original A shape if broadcasting expanded dims
+				self.grad += Tensor._sum_to_shape(grad_A_full, A.shape)
 			if other.requires_grad:
-				other.grad += self.data.T @ out.grad
-        
+				grad_B_full = np.matmul(np.swapaxes(A, -1, -2), dY)
+				other.grad += Tensor._sum_to_shape(grad_B_full, B.shape)
+
 		out._backward = _backward
 		return out
     

@@ -162,6 +162,11 @@ class CompiledModel:
         Notes:
             Loss and metrics are aggregated sample-weighted across batches.
         """
+        # Ensure model is in training mode for the duration of fit
+        prev_train_state = getattr(self.model, 'training', True)
+        if hasattr(self.model, 'train'):
+            self.model.train(True)
+
         for epoch in range(1, epochs + 1):
             # On-the-fly aggregation without post-epoch extra forward pass
             loss_sum = 0.0
@@ -194,7 +199,7 @@ class CompiledModel:
                 else:
                     avg_metrics[name] = metric_sums[name] / max(weight_sum, 1)
 
-            # Validation
+            # Validation (temporarily switch to eval mode so layers like Dropout are disabled)
             val_str = ""
             if validation_data is not None:
                 vx, vy = validation_data
@@ -209,6 +214,10 @@ class CompiledModel:
                 line = ", ".join(parts) + val_str
                 print(line)
 
+        # Restore prior training state
+        if hasattr(self.model, 'train'):
+            self.model.train(prev_train_state)
+
     def evaluate(self, X: np.ndarray, y: np.ndarray, batch_size: int = 64) -> Tuple[float, Dict[str, float]]:
         """Evaluate loss and metrics on a dataset.
 
@@ -220,6 +229,11 @@ class CompiledModel:
         Returns:
             (loss, metrics): loss as float, metrics as dict (e.g., {'accuracy': 0.97}).
         """
+        # Temporarily set model to eval mode (e.g., disable Dropout) and restore afterwards
+        prev_train_state = getattr(self.model, 'training', True)
+        if hasattr(self.model, 'eval'):
+            self.model.eval()
+
         # Sample-weighted aggregation and exact accuracy counting
         loss_sum = 0.0
         weight_sum = 0
@@ -249,6 +263,9 @@ class CompiledModel:
                 avg_metrics[name] = (correct_total / max(weight_sum, 1))
             else:
                 avg_metrics[name] = metric_sums[name] / max(weight_sum, 1)
+        # Restore training state
+        if hasattr(self.model, 'train'):
+            self.model.train(prev_train_state)
         return avg_loss, avg_metrics
 
     def predict(self, X: np.ndarray, batch_size: int = 256) -> np.ndarray:
@@ -261,10 +278,18 @@ class CompiledModel:
         Returns:
             ndarray of shape (N, num_classes) with logits.
         """
+        # Temporarily set model to eval mode to disable training-time behaviors (e.g., Dropout)
+        prev_train_state = getattr(self.model, 'training', True)
+        if hasattr(self.model, 'eval'):
+            self.model.eval()
+
         outputs: List[np.ndarray] = []
         for bx, _ in self._data_loader(X, np.zeros(len(X)), batch_size, shuffle=False):
             logits = self.model(Tensor(bx, requires_grad=False))
             outputs.append(logits.data)
+        # Restore training state
+        if hasattr(self.model, 'train'):
+            self.model.train(prev_train_state)
         return np.vstack(outputs) if outputs else np.empty((0,))
 
 

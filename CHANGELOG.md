@@ -6,10 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
-## [2.0.0] - 2025-09-13 (Unreleased, current update date)
+## [2.0.0b0] - 2025-09-15
 
 ### Highlights
 - V2 architecture: internal re-organization, device/runtime/backends scaffolding, and ONNX stubs. Public training API remains familiar (`Sequential`, `compile/fit/evaluate/predict`).
+- Transformer groundwork lands: Multi-Head Attention with causal masking and a pre-LN Transformer block for upcoming GPT-style models.
 
 ### Added
 - New `forgeNN/nn/` package consolidating `activations`, `losses`, `metrics` and `random` with simple registries.
@@ -47,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - `Embedding(vocab_size, embedding_dim, padding_idx=None)`: vector lookup with correct gradient accumulation via `np.add.at`; supports optional frozen padding row.
    - `LayerNorm(normalized_shape=None, eps=1e-5)`: last-dim normalization with learnable affine parameters (gamma/beta) and lazy init.
    - `GlobalAvgPool1D(keepdims=False)` and `GlobalAvgPool2D(keepdims=False)`: reduction over temporal/spatial dims using Tensor.mean; integrates with `Sequential.summary()`.
+ - Transformer components (initial):
+   - `MHA` / `MultiHeadAttention`: scaled dot-product self-attention with cached causal mask, attention dropout, and output projection dropout.
+   - `TransformerBlock`: pre-LN block composed of `LayerNorm` → `MHA` → residual, then `LayerNorm` → `Dense` → GELU → `Dense` → dropout → residual.
+   - Exported at top-level API for convenience: `from forgeNN import MHA, MultiHeadAttention, TransformerBlock`.
  - Examples:
    - `examples/embedding_layernorm_text_classification.py`: fastText-style classifier showing Embedding → GlobalAvgPool1D → LayerNorm → Dropout → Dense on a synthetic dataset.
    - `examples/embedding_layernorm_text_classification.md`: step-by-step README explaining data generation, model, training, troubleshooting, and extensions.
@@ -65,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - `forgeNN.randint` intentionally returns a NumPy array (indices), while `forgeNN.stack` accepts both Tensors and array-likes and returns a `Tensor`.
  - Layer naming consistency: renamed placeholders `Convo1D/Convo2D` to `Conv1D/Conv2D`.
  - Top-level exports: added `Embedding`, `LayerNorm`, `GlobalAvgPool1D`, and `GlobalAvgPool2D` to `forgeNN.__init__` for direct import.
+ - Top-level exports (cont.): added `MHA`, `MultiHeadAttention`, and `TransformerBlock` under `forgeNN.__init__`.
  - `Sequential.summary()` shape inference enhanced to recognize GlobalAvgPool layers (handles keepdims output forms) and Embedding (appends `embedding_dim`).
 
 ### Fixed
@@ -73,6 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `mean.backward` supports tuple axes with correct scaling; `max.backward` stabilized for ties with epsilon.
  - Example compatibility: `examples/transformer/gpt.py` now runs end-to-end. Resolved earlier errors by introducing `Tensor` slicing support and aligning `randint` (returns indices array) and `stack` semantics.
  - Prevented import-time crashes from unimplemented layer stubs (Conv/Pool/BatchNorm) by moving `NotImplementedError` to `__init__/forward` instead of class body scope.
+ - Validation/evaluation now run with layers in eval mode (disables Dropout): training utilities toggle `train()/eval()` automatically during `evaluate()` and `predict()`, and keep training mode during minibatches in `fit`. This removes excessive validation jitter and matches Keras behavior.
 
 ### Deprecated
 - Top-level `forgeNN/tensor.py` is a compatibility shim. It will be removed in a future release—please update imports to `forgeNN.core.tensor`.
@@ -81,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - Aggressive cleanup of unused/deprecated assets: old guides, legacy scripts, and test scaffolding.
+ - Experimental Colab notebook and early transformer example scripts were removed to keep the repository lean; the `examples/transformer/` folder currently serves as a placeholder for future, smaller examples.
 
 ### Performance
 - Small speedups from reduced activation wrapper overhead, simplified shape inference, and fused gradient reductions.
@@ -88,6 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Notes
 - CUDA remains a scaffold at this time: backend is not wired to Tensor ops yet.
 - ONNX export Stage 1 (subset) and import Stage 1 (linear MLP graphs) are implemented.
+- Transformer notes: `PositionalEncoding` and `PositionalEmbedding` remain stubs raising `NotImplementedError` and are planned for a subsequent 2.x minor.
 - Public API remains familiar; examples updated accordingly. A deprecation window exists for the `Tensor` import path via the shim.
 
 #### ONNX Export (Stage 1) Details
