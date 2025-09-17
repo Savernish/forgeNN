@@ -13,14 +13,14 @@ Usage example:
     ... ])
 
 Notes:
-    - Activations can be strings ('relu', 'tanh', 'sigmoid', 'swish', 'linear'),
+    - Activations can be strings ('relu', 'tanh', 'sigmoid', 'swish', 'linear', etc.),
       activation classes (RELU, TANH, etc.), or callables taking a Tensor.
     - Parameters are collected from all layers for optimization.
 """
 
 from typing import Callable, Iterable, List, Optional, Sequence, Union, Tuple
 
-from .core.tensor import Tensor
+from .core.tensor import Tensor, stack
 from .nn.activations import ACTIVATION_FUNCTIONS  # v2 unified activation mapping
 import numpy as np
 
@@ -655,23 +655,111 @@ class AvgPool2D(Layer):
         return []
 
 class Conv1D(Layer):
-    """Placeholder for 1D convolution (not implemented yet)."""
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError("Conv1D is not implemented yet")
+    """Naive 1D convolution over NCL inputs using sliding windows (no padding/dilation).
 
-    def forward(self, x: Tensor) -> Tensor:  # pragma: no cover
-        raise NotImplementedError("Conv1D is not implemented yet")
+    Args:
+        cin: Input channels.
+        cout: Output channels (filters).
+        kernel_size: Size of the 1D kernel (>0).
+        stride: Stride along length (>=1).
+        padding: Currently unsupported (must be 0).
+    """
+
+    def __init__(self, cin: int, cout: int, kernel_size: int, stride: int = 1, padding: int = 0):
+        if kernel_size <= 0:
+            raise ValueError("kernel_size must be a positive integer")
+        if stride <= 0:
+            raise ValueError("stride must be >= 1")
+        if padding != 0:
+            raise NotImplementedError("Conv1D padding is not implemented yet")
+
+        self.cin = int(cin)
+        self.cout = int(cout)
+        self.kernel_size = int(kernel_size)
+        self.stride = int(stride)
+        self.padding = int(padding)
+
+        # Xavier/Glorot uniform init similar to Dense
+        fan_in = self.cin * self.kernel_size
+        fan_out = self.cout * self.kernel_size
+        limit = float(np.sqrt(6.0 / (fan_in + fan_out)))
+        W = np.random.uniform(-limit, limit, (self.cout, self.cin, self.kernel_size)).astype(np.float32)
+        self.W = Tensor(W, requires_grad=True)
+        self.b = Tensor(np.zeros(self.cout, dtype=np.float32), requires_grad=True)
+
+    def forward(self, x: Tensor) -> Tensor:
+        # x: (N, C_in, L)
+        if len(x.shape) != 3:
+            raise ValueError("Conv1D expects input of shape (N, C, L)")
+        N, C_in, L = x.shape
+        if C_in != self.cin:
+            raise ValueError(f"Conv1D: expected {self.cin} input channels, got {C_in}")
+
+        K = self.kernel_size
+        s = self.stride
+        L_out = (L - K) // s + 1
+        if L_out <= 0 or (L - K) < 0:
+            raise ValueError(f"Invalid shapes for Conv1D: input length {L}, kernel {K}, stride {s}")
+
+        # Unfold along length into windows: list of (N, C_in, L_out)
+        slices: List[Tensor] = []
+        for u in range(K):
+            sl = x[:, :, u : u + L_out * s : s]
+            slices.append(sl)
+        # Stack into window dimension -> (N, C_in, L_out, K)
+        windows = stack(slices, axis=3)
+
+        # Reshape for batched matmul: (N, L_out, C_in*K)
+        X_col = windows.transpose(0, 2, 1, 3).reshape(N, L_out, C_in * K)
+
+        # Weights: (Cout, Cin, K) -> (Cin*K, Cout)
+        W_col = self.W.reshape(self.cout, C_in * K).transpose(1, 0)
+
+        # MatMul -> (N, L_out, Cout)
+        Y = X_col @ W_col
+        # Add bias
+        Y = Y + self.b
+        # Return (N, Cout, L_out)
+        return Y.transpose(0, 2, 1)
 
     def parameters(self) -> List[Tensor]:
-        return []
+        return [self.W, self.b]
 
 class MaxPool1D(Layer):
-    """Placeholder for 1D max pooling (not implemented yet)."""
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError("MaxPool1D is not implemented yet")
+    """1D max pooling over NCL inputs (no padding/dilation).
 
-    def forward(self, x: Tensor) -> Tensor:  # pragma: no cover
-        raise NotImplementedError("MaxPool1D is not implemented yet")
+    Args:
+        kernel_size: Size of the pooling window (>0).
+        stride: Stride along length (defaults to kernel_size).
+    """
+
+    def __init__(self, kernel_size: int, stride: Optional[int] = None):
+        if int(kernel_size) <= 0:
+            raise ValueError("kernel_size must be a positive integer")
+        self.kernel_size = int(kernel_size)
+        self.stride = int(stride) if stride is not None else int(kernel_size)
+        if self.stride <= 0:
+            raise ValueError("stride must be >= 1")
+
+    def forward(self, x: Tensor) -> Tensor:
+        # x: (N, C, L)
+        if len(x.shape) != 3:
+            raise ValueError("MaxPool1D expects input of shape (N, C, L)")
+        N, C, L = x.shape
+        K = self.kernel_size
+        s = self.stride
+        L_out = (L - K) // s + 1
+        if L_out <= 0 or (L - K) < 0:
+            raise ValueError(f"Invalid shapes for MaxPool1D: input length {L}, kernel {K}, stride {s}")
+
+        # Unfold along length into windows: (N, C, L_out, K)
+        slices: List[Tensor] = []
+        for u in range(K):
+            sl = x[:, :, u : u + L_out * s : s]
+            slices.append(sl)
+        windows = stack(slices, axis=3)
+        # Max over window dimension -> (N, C, L_out)
+        return windows.max(axis=3, keepdims=False)
 
     def parameters(self) -> List[Tensor]:
         return []

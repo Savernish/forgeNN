@@ -7,7 +7,7 @@ Lean public API with stable, documented entry points. Docstrings preserved.
 
 from .core.tensor import Tensor
 from .core.tensor import randint, stack
-from .layers import Layer, ActivationWrapper, Sequential, Dense, Flatten, Input, Dropout, GlobalAvgPool1D, GlobalAvgPool2D, Embedding, LayerNorm
+from .layers import Layer, ActivationWrapper, Sequential, Dense, Flatten, Input, Dropout, GlobalAvgPool1D, GlobalAvgPool2D, Embedding, LayerNorm, Conv1D, MaxPool1D
 from .transformer.layers import TransformerLayer, MHA, MultiHeadAttention, TransformerBlock, PositionalEncoding, PositionalEmbedding
 from .optimizers import Optimizer, SGD, Adam, AdamW
 from .training import compile
@@ -23,6 +23,7 @@ __version__ = "2.0.0b0"
 __all__ = [
     'Tensor', 'randint', 'stack',
     'Layer', 'ActivationWrapper', 'Sequential', 'Dense', 'Flatten', 'Input', 'Dropout',
+    'Conv1D', 'MaxPool1D',
     'TransformerLayer', 'MHA', 'MultiHeadAttention', 'TransformerBlock', 'PositionalEncoding', 'PositionalEmbedding',
     'GlobalAvgPool1D', 'GlobalAvgPool2D', 'Embedding', 'LayerNorm',
     'Optimizer', 'SGD', 'Adam', 'AdamW',
