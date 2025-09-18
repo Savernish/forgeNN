@@ -624,7 +624,7 @@ class LayerNorm(Layer):
 
 class Conv2D(Layer):
     """Placeholder for 2D convolution (not implemented yet)."""
-    def __init__(self, *args, **kwargs):
+    def __init__(self, c ):
         raise NotImplementedError("Conv2D is not implemented yet")
 
     def forward(self, x: Tensor) -> Tensor:  # pragma: no cover
