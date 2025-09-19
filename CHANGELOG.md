@@ -87,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Example compatibility: `examples/transformer/gpt.py` now runs end-to-end. Resolved earlier errors by introducing `Tensor` slicing support and aligning `randint` (returns indices array) and `stack` semantics.
  - Prevented import-time crashes from unimplemented layer stubs (Conv/Pool/BatchNorm) by moving `NotImplementedError` to `__init__/forward` instead of class body scope.
  - Validation/evaluation now run with layers in eval mode (disables Dropout): training utilities toggle `train()/eval()` automatically during `evaluate()` and `predict()`, and keep training mode during minibatches in `fit`. This removes excessive validation jitter and matches Keras behavior.
+ - ONNX export: Lazily initialize `Dense` parameters from inferred input features during export when uninitialized, fixing `AttributeError: 'NoneType' object has no attribute 'data'` for fresh models.
 
 ### Deprecated
 - Top-level `forgeNN/tensor.py` is a compatibility shim. It will be removed in a future release—please update imports to `forgeNN.core.tensor`.

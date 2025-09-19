@@ -166,7 +166,7 @@ If you see unstable training:
 ## Extending this example
 
 - Positional information: Add/learn positional embeddings and sum with token embeddings before pooling.
-- Other pooling: Replace global avg with attention pooling or max pooling (once implemented).
+- Other pooling: Replace global avg with attention pooling or max pooling.
 - Deeper head: Add a small MLP (e.g., `Dense(4*D) @ 'gelu'` → Dropout → `Dense(C)`).
 - Regularization: Increase Dropout or add `LayerNorm` in more places.
 - Multi-class: Increase `num_classes` and adjust the labeling rule accordingly.

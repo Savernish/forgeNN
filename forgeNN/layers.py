@@ -23,6 +23,7 @@ from typing import Callable, Iterable, List, Optional, Sequence, Union, Tuple
 from .core.tensor import Tensor, stack
 from .nn.activations import ACTIVATION_FUNCTIONS  # v2 unified activation mapping
 import numpy as np
+from numpy.lib.stride_tricks import as_strided
 
 
 ActivationType = Union[str, type, Callable[[Tensor], Tensor]]
@@ -410,7 +411,8 @@ class Flatten(Layer):
         if len(x.shape) <= 2:
             return x
         batch = x.shape[0]
-        return x.view(batch, -1)
+        # Use reshape to allow non-contiguous inputs (e.g., after transpose)
+        return x.reshape(batch, -1)
 
     def parameters(self) -> List[Tensor]:
         """Flatten has no trainable parameters."""
@@ -704,26 +706,33 @@ class Conv2D(Layer):
                 f"Invalid shapes for Conv2D: input {(H, W)}, kernel {(kh, kw)}, stride {(sh, sw)}"
             )
 
-        # Unfold along height/width into windows: list of (N, C_in, H_out, W_out)
-        slices: List[Tensor] = []
-        for u in range(kh):
-            for v in range(kw):
-                sl = x[:, :, u : u + H_out * sh : sh, v : v + W_out * sw : sw]
-                slices.append(sl)
-        # Stack into window dimension -> (N, C_in, H_out, W_out, kh*kw)
-        windows = stack(slices, axis=4)
+        # Vectorized unfold (im2col) via as_strided
+        sN, sC, sH, sW = x.data.strides
+        win_shape = (N, C_in, H_out, W_out, kh, kw)
+        win_strides = (sN, sC, sH * sh, sW * sw, sH, sW)
+        windows_data = as_strided(x.data, shape=win_shape, strides=win_strides)
+        windows = Tensor(windows_data, requires_grad=x.requires_grad, _children=(x,), _op="unfold2d")
 
-        # Reshape for batched matmul: (N, H_out, W_out, C_in*kh*kw)
-        X_col = windows.transpose(0, 2, 3, 1, 4).reshape(N, H_out, W_out, C_in * kh * kw)
+        def _bw_unfold2d():
+            if not x.requires_grad:
+                return
+            g = windows.grad  # (N, C, H_out, W_out, kh, kw)
+            for u in range(kh):
+                for v in range(kw):
+                    x.grad[:, :, u : u + H_out * sh : sh, v : v + W_out * sw : sw] += g[:, :, :, :, u, v]
+        windows._backward = _bw_unfold2d
+
+        # Reshape for single GEMM: (N*H_out*W_out, C_in*kh*kw)
+        X_col = windows.transpose(0, 2, 3, 1, 4, 5).reshape(N * H_out * W_out, C_in * kh * kw)
 
         # Weights: (Cout, Cin, kh, kw) -> (Cin*kh*kw, Cout)
         W_col = self.W.reshape(self.cout, C_in * kh * kw).transpose(1, 0)
 
-        # MatMul -> (N, H_out, W_out, Cout)
-        Y = X_col @ W_col
-        # Add bias
+        # Single MatMul -> (N*H_out*W_out, Cout) then reshape back
+        Y2 = X_col @ W_col
+        Y = Y2.reshape(N, H_out, W_out, self.cout)
+        # Add bias and return (N, Cout, H_out, W_out)
         Y = Y + self.b
-        # Return (N, Cout, H_out, W_out)
         return Y.transpose(0, 3, 1, 2)
 
     def parameters(self) -> List[Tensor]:
@@ -768,14 +777,24 @@ class MaxPool2D(Layer):
             raise ValueError(
                 f"Invalid shapes for MaxPool2D: input {(H, W)}, kernel {(kh, kw)}, stride {(sh, sw)}"
             )
-        # Unfold windows and take max over window dimension
-        slices: List[Tensor] = []
-        for u in range(kh):
-            for v in range(kw):
-                sl = x[:, :, u : u + H_out * sh : sh, v : v + W_out * sw : sw]
-                slices.append(sl)
-        windows = stack(slices, axis=4)  # (N, C, H_out, W_out, kh*kw)
-        return windows.max(axis=4, keepdims=False)
+        # Unfold via as_strided and take max
+        sN, sC, sH, sW = x.data.strides
+        win_shape = (N, C, H_out, W_out, kh, kw)
+        win_strides = (sN, sC, sH * sh, sW * sw, sH, sW)
+        windows_data = as_strided(x.data, shape=win_shape, strides=win_strides)
+        windows = Tensor(windows_data, requires_grad=x.requires_grad, _children=(x,), _op="unfold2d_pool")
+
+        def _bw_unfold2d_pool():
+            if not x.requires_grad:
+                return
+            g = windows.grad  # (N, C, H_out, W_out, kh, kw)
+            for u in range(kh):
+                for v in range(kw):
+                    x.grad[:, :, u : u + H_out * sh : sh, v : v + W_out * sw : sw] += g[:, :, :, :, u, v]
+        windows._backward = _bw_unfold2d_pool
+
+        # Max over kernel dims -> (N, C, H_out, W_out)
+        return windows.max(axis=5, keepdims=False).max(axis=4, keepdims=False)
 
     def parameters(self) -> List[Tensor]:
         return []
@@ -836,26 +855,32 @@ class Conv1D(Layer):
         L_out = (L - K) // s + 1
         if L_out <= 0 or (L - K) < 0:
             raise ValueError(f"Invalid shapes for Conv1D: input length {L}, kernel {K}, stride {s}")
+        # Vectorized unfold via as_strided
+        sN, sC, sL = x.data.strides
+        win_shape = (N, C_in, L_out, K)
+        win_strides = (sN, sC, sL * s, sL)
+        windows_data = as_strided(x.data, shape=win_shape, strides=win_strides)
+        windows = Tensor(windows_data, requires_grad=x.requires_grad, _children=(x,), _op="unfold1d")
 
-        # Unfold along length into windows: list of (N, C_in, L_out)
-        slices: List[Tensor] = []
-        for u in range(K):
-            sl = x[:, :, u : u + L_out * s : s]
-            slices.append(sl)
-        # Stack into window dimension -> (N, C_in, L_out, K)
-        windows = stack(slices, axis=3)
+        def _bw_unfold1d():
+            if not x.requires_grad:
+                return
+            g = windows.grad  # (N, C, L_out, K)
+            for u in range(K):
+                x.grad[:, :, u : u + L_out * s : s] += g[:, :, :, u]
+        windows._backward = _bw_unfold1d
 
-        # Reshape for batched matmul: (N, L_out, C_in*K)
-        X_col = windows.transpose(0, 2, 1, 3).reshape(N, L_out, C_in * K)
+        # Reshape for single GEMM: (N*L_out, C_in*K)
+        X_col = windows.transpose(0, 2, 1, 3).reshape(N * L_out, C_in * K)
 
         # Weights: (Cout, Cin, K) -> (Cin*K, Cout)
         W_col = self.W.reshape(self.cout, C_in * K).transpose(1, 0)
 
-        # MatMul -> (N, L_out, Cout)
-        Y = X_col @ W_col
-        # Add bias
+        # Single MatMul -> (N*L_out, Cout) then reshape back
+        Y2 = X_col @ W_col
+        Y = Y2.reshape(N, L_out, self.cout)
+        # Add bias and return (N, Cout, L_out)
         Y = Y + self.b
-        # Return (N, Cout, L_out)
         return Y.transpose(0, 2, 1)
 
     def parameters(self) -> List[Tensor]:
@@ -887,13 +912,21 @@ class MaxPool1D(Layer):
         L_out = (L - K) // s + 1
         if L_out <= 0 or (L - K) < 0:
             raise ValueError(f"Invalid shapes for MaxPool1D: input length {L}, kernel {K}, stride {s}")
+        # Unfold via as_strided and take max
+        sN, sC, sL = x.data.strides
+        win_shape = (N, C, L_out, K)
+        win_strides = (sN, sC, sL * s, sL)
+        windows_data = as_strided(x.data, shape=win_shape, strides=win_strides)
+        windows = Tensor(windows_data, requires_grad=x.requires_grad, _children=(x,), _op="unfold1d_pool")
 
-        # Unfold along length into windows: (N, C, L_out, K)
-        slices: List[Tensor] = []
-        for u in range(K):
-            sl = x[:, :, u : u + L_out * s : s]
-            slices.append(sl)
-        windows = stack(slices, axis=3)
+        def _bw_unfold1d_pool():
+            if not x.requires_grad:
+                return
+            g = windows.grad  # (N, C, L_out, K)
+            for u in range(K):
+                x.grad[:, :, u : u + L_out * s : s] += g[:, :, :, u]
+        windows._backward = _bw_unfold1d_pool
+
         # Max over window dimension -> (N, C, L_out)
         return windows.max(axis=3, keepdims=False)
 

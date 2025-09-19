@@ -147,8 +147,8 @@ class CompiledModel:
         shuffle: bool = True,
         validation_data: Optional[Tuple[np.ndarray, np.ndarray]] = None,
         verbose: int = 1,
-    ) -> None:
-        """Train the model for a fixed number of epochs.
+    ) -> Dict[str, List[float]]:
+        """Train the model for a fixed number of epochs and return history.
 
         Args:
             X: Training features of shape (N, D).
@@ -162,6 +162,17 @@ class CompiledModel:
         Notes:
             Loss and metrics are aggregated sample-weighted across batches.
         """
+        # History containers (Keras-like keys)
+        history: Dict[str, List[float]] = {
+            'loss': [],
+        }
+        for name, _ in self.metric_fns:
+            history[name] = []
+        if validation_data is not None:
+            history['val_loss'] = []
+            for name, _ in self.metric_fns:
+                history[f'val_{name}'] = []
+
         # Ensure model is in training mode for the duration of fit
         prev_train_state = getattr(self.model, 'training', True)
         if hasattr(self.model, 'train'):
@@ -199,6 +210,11 @@ class CompiledModel:
                 else:
                     avg_metrics[name] = metric_sums[name] / max(weight_sum, 1)
 
+            # Record train metrics into history
+            history['loss'].append(float(avg_loss))
+            for k, v in avg_metrics.items():
+                history[k].append(float(v))
+
             # Validation (temporarily switch to eval mode so layers like Dropout are disabled)
             val_str = ""
             if validation_data is not None:
@@ -206,6 +222,11 @@ class CompiledModel:
                 v_loss, v_metrics = self.evaluate(vx, vy, batch_size=batch_size)
                 val_parts = [f"val_loss={v_loss:.4f}"] + [f"val_{k}={v_metrics[k]*100:.1f}%" if k == "accuracy" else f"val_{k}={v_metrics[k]:.4f}" for k in v_metrics]
                 val_str = "  " + ", ".join(val_parts)
+
+                # Record val metrics into history
+                history['val_loss'].append(float(v_loss))
+                for k, v in v_metrics.items():
+                    history[f'val_{k}'].append(float(v))
 
             if verbose:
                 parts = [f"Epoch {epoch}/{epochs}", f"loss={avg_loss:.4f}"]
@@ -217,6 +238,7 @@ class CompiledModel:
         # Restore prior training state
         if hasattr(self.model, 'train'):
             self.model.train(prev_train_state)
+        return history
 
     def evaluate(self, X: np.ndarray, y: np.ndarray, batch_size: int = 64) -> Tuple[float, Dict[str, float]]:
         """Evaluate loss and metrics on a dataset.

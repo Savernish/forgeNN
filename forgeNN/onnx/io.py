@@ -146,17 +146,27 @@ def export_onnx(
             if cname == "Dense":
                 # Dense as Gemm; decide transB from weight shape vs input features
                 n = next_name("dense"); out = f"{n}_out"
+                # Infer input features (last dim of current shape)
+                in_feat: Optional[int] = None
+                if current_shape and isinstance(current_shape[-1], (int, np.integer)):
+                    in_feat = int(current_shape[-1])
+
+                # Ensure parameters are initialized
+                if getattr(core, 'W', None) is None or getattr(core, 'b', None) is None:
+                    if in_feat is None:
+                        raise ValueError("ONNX export: cannot infer Dense input features for initialization.")
+                    # Initialize weights lazily based on inferred features
+                    try:
+                        core._init_params(in_feat)  # type: ignore[attr-defined]
+                    except Exception as e:
+                        raise ValueError(f"ONNX export: failed to initialize Dense params with in_features={in_feat}") from e
+
                 W = core.W.data.astype(np.float32, copy=False)
                 b = core.b.data.astype(np.float32, copy=False)
 
-                # Infer input features (last dim of current shape)
-                in_feat = None
-                if current_shape and isinstance(current_shape[-1], (int, np.integer)):
-                    in_feat = int(current_shape[-1])
-                else:
-                    # Fallback to weight dims when symbolic
+                if in_feat is None:
+                    # If still unknown (shouldn't happen after init), fallback to W dims
                     in_feat = int(W.shape[0])
-
                 if W.shape[0] == in_feat:
                     transB = 0
                     out_dim = int(W.shape[1])
