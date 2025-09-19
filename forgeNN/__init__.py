@@ -21,7 +21,7 @@ from .model.io import state_dict, load_state_dict, save_npz, load_npz
 # Expose subpackages as attributes for convenient access (e.g., fnn.nn.set_seed)
 from . import nn as nn  # noqa: F401
 
-__version__ = "2.0.0b1"
+__version__ = "2.0.0rc1"
 __all__ = [
     'Tensor', 'randint', 'stack',
     'Layer', 'ActivationWrapper', 'Sequential', 'Dense', 'Flatten', 'Input', 'Dropout',

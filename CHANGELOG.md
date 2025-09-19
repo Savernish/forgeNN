@@ -48,6 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - `Embedding(vocab_size, embedding_dim, padding_idx=None)`: vector lookup with correct gradient accumulation via `np.add.at`; supports optional frozen padding row.
    - `LayerNorm(normalized_shape=None, eps=1e-5)`: last-dim normalization with learnable affine parameters (gamma/beta) and lazy init.
    - `GlobalAvgPool1D(keepdims=False)` and `GlobalAvgPool2D(keepdims=False)`: reduction over temporal/spatial dims using Tensor.mean; integrates with `Sequential.summary()`.
+   - Conv1D and MaxPool1D implementations (stride support; valid padding only). Autograd-safe via Tensor slicing/stack/matmul. Exported at top level.
+   - Conv2D and MaxPool2D implementations (NCHW; rectangular kernels/strides; valid padding only). Autograd-safe sliding-window implementation. Exported at top level.
+ - Model serialization utilities in `forgeNN/model/io.py`:
+   - `state_dict(model)`, `load_state_dict(model, state)`
+   - `save_npz(path, model)`, `load_npz(path)`
  - Transformer components (initial):
    - `MHA` / `MultiHeadAttention`: scaled dot-product self-attention with cached causal mask, attention dropout, and output projection dropout.
    - `TransformerBlock`: pre-LN block composed of `LayerNorm` → `MHA` → residual, then `LayerNorm` → `Dense` → GELU → `Dense` → dropout → residual.
@@ -72,6 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Top-level exports: added `Embedding`, `LayerNorm`, `GlobalAvgPool1D`, and `GlobalAvgPool2D` to `forgeNN.__init__` for direct import.
  - Top-level exports (cont.): added `MHA`, `MultiHeadAttention`, and `TransformerBlock` under `forgeNN.__init__`.
  - `Sequential.summary()` shape inference enhanced to recognize GlobalAvgPool layers (handles keepdims output forms) and Embedding (appends `embedding_dim`).
+ - Activation registry: added `'softmax'` (and `'gelu'`) to `forgeNN/nn/activations.py`.
+ - Public API: exported `Conv1D`, `MaxPool1D`, `Conv2D`, `MaxPool2D`, and model IO helpers from `forgeNN.__init__`. 
 
 ### Fixed
 - Broadcasting-aware gradient reductions centralized (`_sum_to_shape`) for add/mul and friends.
@@ -98,6 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ONNX export Stage 1 (subset) and import Stage 1 (linear MLP graphs) are implemented.
 - Transformer notes: `PositionalEncoding` and `PositionalEmbedding` remain stubs raising `NotImplementedError` and are planned for a subsequent 2.x minor.
 - Public API remains familiar; examples updated accordingly. A deprecation window exists for the `Tensor` import path via the shim.
+- Conv/Pool currently support stride; padding/dilation are not yet implemented and will raise `NotImplementedError`.
 
 #### ONNX Export (Stage 1) Details
 - Scope: Sequential-only, feed-forward MLP graphs without branches.

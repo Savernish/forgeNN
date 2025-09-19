@@ -623,23 +623,159 @@ class LayerNorm(Layer):
         return [p for p in (self.gamma, self.beta) if p is not None]
 
 class Conv2D(Layer):
-    """Placeholder for 2D convolution (not implemented yet)."""
-    def __init__(self, c ):
-        raise NotImplementedError("Conv2D is not implemented yet")
+    """2D convolution over NCHW inputs using sliding windows (no padding/dilation).
+
+    Args:
+        cin: Input channels.
+        cout: Output channels (filters).
+        kernel_size: int or (kh, kw).
+        stride: int or (sh, sw).
+        padding: Currently unsupported (must be 0 or (0,0)).
+        dilation: Currently unsupported (must be 1 or (1,1)).
+    """
+    def __init__(
+        self,
+        cin: int,
+        cout: int,
+        kernel_size: Union[int, Tuple[int, int]],
+        stride: Union[int, Tuple[int, int]] = 1,
+        padding: Union[int, Tuple[int, int]] = 0,
+        dilation: Union[int, Tuple[int, int]] = 1,
+    ):
+        # Normalize kernel size and stride to tuples
+        if isinstance(kernel_size, int):
+            kh, kw = kernel_size, kernel_size
+        else:
+            kh, kw = int(kernel_size[0]), int(kernel_size[1])
+        if isinstance(stride, int):
+            sh, sw = stride, stride
+        else:
+            sh, sw = int(stride[0]), int(stride[1])
+
+        if kh <= 0 or kw <= 0:
+            raise ValueError("kernel_size must be positive")
+        if sh <= 0 or sw <= 0:
+            raise ValueError("stride must be >= 1")
+        if isinstance(padding, tuple):
+            ph, pw = int(padding[0]), int(padding[1])
+        else:
+            ph = pw = int(padding)
+        if isinstance(dilation, tuple):
+            dh, dw = int(dilation[0]), int(dilation[1])
+        else:
+            dh = dw = int(dilation)
+        if ph != 0 or pw != 0:
+            raise NotImplementedError("Conv2D padding is not implemented yet")
+        if dh != 1 or dw != 1:
+            raise NotImplementedError("Conv2D dilation is not implemented yet")
+
+        self.cin = int(cin)
+        self.cout = int(cout)
+        self.kernel_h = kh
+        self.kernel_w = kw
+        self.stride_h = sh
+        self.stride_w = sw
+        self.padding_h = ph
+        self.padding_w = pw
+        self.dilation_h = dh
+        self.dilation_w = dw
+
+        # Xavier/Glorot uniform init similar to Dense
+        fan_in = self.cin * kh * kw
+        fan_out = self.cout * kh * kw
+        limit = float(np.sqrt(6.0 / (fan_in + fan_out)))
+        W = np.random.uniform(-limit, limit, (self.cout, self.cin, kh, kw)).astype(np.float32)
+        self.W = Tensor(W, requires_grad=True)
+        self.b = Tensor(np.zeros(self.cout, dtype=np.float32), requires_grad=True)
 
     def forward(self, x: Tensor) -> Tensor:  # pragma: no cover
-        raise NotImplementedError("Conv2D is not implemented yet")
+        # Validate input shape
+        if len(x.shape) != 4:
+            raise ValueError("Conv2D expects input of shape (N, C, H, W)")
+        N, C_in, H, W = x.shape
+        if C_in != self.cin:
+            raise ValueError(f"Conv2D: expected {self.cin} input channels, got {C_in}")
+        kh, kw = self.kernel_h, self.kernel_w
+        sh, sw = self.stride_h, self.stride_w
+        H_out = (H - kh) // sh + 1
+        W_out = (W - kw) // sw + 1
+        if H_out <= 0 or W_out <= 0 or (H - kh) < 0 or (W - kw) < 0:
+            raise ValueError(
+                f"Invalid shapes for Conv2D: input {(H, W)}, kernel {(kh, kw)}, stride {(sh, sw)}"
+            )
+
+        # Unfold along height/width into windows: list of (N, C_in, H_out, W_out)
+        slices: List[Tensor] = []
+        for u in range(kh):
+            for v in range(kw):
+                sl = x[:, :, u : u + H_out * sh : sh, v : v + W_out * sw : sw]
+                slices.append(sl)
+        # Stack into window dimension -> (N, C_in, H_out, W_out, kh*kw)
+        windows = stack(slices, axis=4)
+
+        # Reshape for batched matmul: (N, H_out, W_out, C_in*kh*kw)
+        X_col = windows.transpose(0, 2, 3, 1, 4).reshape(N, H_out, W_out, C_in * kh * kw)
+
+        # Weights: (Cout, Cin, kh, kw) -> (Cin*kh*kw, Cout)
+        W_col = self.W.reshape(self.cout, C_in * kh * kw).transpose(1, 0)
+
+        # MatMul -> (N, H_out, W_out, Cout)
+        Y = X_col @ W_col
+        # Add bias
+        Y = Y + self.b
+        # Return (N, Cout, H_out, W_out)
+        return Y.transpose(0, 3, 1, 2)
 
     def parameters(self) -> List[Tensor]:
-        return []
+        return [self.W, self.b]
 
 class MaxPool2D(Layer):
-    """Placeholder for 2D max pooling (not implemented yet)."""
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError("MaxPool2D is not implemented yet")
+    """2D max pooling over NCHW inputs (no padding/dilation).
 
-    def forward(self, x: Tensor) -> Tensor:  # pragma: no cover
-        raise NotImplementedError("MaxPool2D is not implemented yet")
+    Args:
+        kernel_size: int or (kh, kw).
+        stride: int or (sh, sw) (defaults to kernel_size).
+    """
+    def __init__(self, kernel_size: Union[int, Tuple[int, int]], stride: Optional[Union[int, Tuple[int, int]]] = None):
+        if isinstance(kernel_size, int):
+            kh, kw = kernel_size, kernel_size
+        else:
+            kh, kw = int(kernel_size[0]), int(kernel_size[1])
+        if stride is None:
+            sh, sw = kh, kw
+        elif isinstance(stride, int):
+            sh, sw = stride, stride
+        else:
+            sh, sw = int(stride[0]), int(stride[1])
+        if kh <= 0 or kw <= 0:
+            raise ValueError("kernel_size must be positive")
+        if sh <= 0 or sw <= 0:
+            raise ValueError("stride must be >= 1")
+        self.kernel_h = kh
+        self.kernel_w = kw
+        self.stride_h = sh
+        self.stride_w = sw
+
+    def forward(self, x: Tensor) -> Tensor:
+        if len(x.shape) != 4:
+            raise ValueError("MaxPool2D expects input of shape (N, C, H, W)")
+        N, C, H, W = x.shape
+        kh, kw = self.kernel_h, self.kernel_w
+        sh, sw = self.stride_h, self.stride_w
+        H_out = (H - kh) // sh + 1
+        W_out = (W - kw) // sw + 1
+        if H_out <= 0 or W_out <= 0 or (H - kh) < 0 or (W - kw) < 0:
+            raise ValueError(
+                f"Invalid shapes for MaxPool2D: input {(H, W)}, kernel {(kh, kw)}, stride {(sh, sw)}"
+            )
+        # Unfold windows and take max over window dimension
+        slices: List[Tensor] = []
+        for u in range(kh):
+            for v in range(kw):
+                sl = x[:, :, u : u + H_out * sh : sh, v : v + W_out * sw : sw]
+                slices.append(sl)
+        windows = stack(slices, axis=4)  # (N, C, H_out, W_out, kh*kw)
+        return windows.max(axis=4, keepdims=False)
 
     def parameters(self) -> List[Tensor]:
         return []
