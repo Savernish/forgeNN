@@ -24,6 +24,33 @@ from .core.tensor import Tensor, stack
 from .nn.activations import ACTIVATION_FUNCTIONS  # v2 unified activation mapping
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
+from numba import njit, prange
+
+
+@njit(parallel=True, fastmath=True)
+def _scatter_unfold1d_add(x_grad: np.ndarray, g: np.ndarray, stride: int) -> None:
+    N, C, L_out, K = g.shape
+    for n in prange(N):
+        for c in range(C):
+            for u in range(K):
+                idx = u
+                for t in range(L_out):
+                    x_grad[n, c, idx] += g[n, c, t, u]
+                    idx += stride
+
+
+@njit(parallel=True, fastmath=True)
+def _scatter_unfold2d_add(x_grad: np.ndarray, g: np.ndarray, sh: int, sw: int) -> None:
+    N, C, H_out, W_out, kh, kw = g.shape
+    for n in prange(N):
+        for c in range(C):
+            for u in range(kh):
+                for v in range(kw):
+                    for i in range(H_out):
+                        base_h = u + i * sh
+                        for j in range(W_out):
+                            base_w = v + j * sw
+                            x_grad[n, c, base_h, base_w] += g[n, c, i, j, u, v]
 
 
 ActivationType = Union[str, type, Callable[[Tensor], Tensor]]
@@ -717,9 +744,7 @@ class Conv2D(Layer):
             if not x.requires_grad:
                 return
             g = windows.grad  # (N, C, H_out, W_out, kh, kw)
-            for u in range(kh):
-                for v in range(kw):
-                    x.grad[:, :, u : u + H_out * sh : sh, v : v + W_out * sw : sw] += g[:, :, :, :, u, v]
+            _scatter_unfold2d_add(x.grad, g, sh, sw)
         windows._backward = _bw_unfold2d
 
         # Reshape for single GEMM: (N*H_out*W_out, C_in*kh*kw)
@@ -788,9 +813,7 @@ class MaxPool2D(Layer):
             if not x.requires_grad:
                 return
             g = windows.grad  # (N, C, H_out, W_out, kh, kw)
-            for u in range(kh):
-                for v in range(kw):
-                    x.grad[:, :, u : u + H_out * sh : sh, v : v + W_out * sw : sw] += g[:, :, :, :, u, v]
+            _scatter_unfold2d_add(x.grad, g, sh, sw)
         windows._backward = _bw_unfold2d_pool
 
         # Max over kernel dims -> (N, C, H_out, W_out)
@@ -866,8 +889,7 @@ class Conv1D(Layer):
             if not x.requires_grad:
                 return
             g = windows.grad  # (N, C, L_out, K)
-            for u in range(K):
-                x.grad[:, :, u : u + L_out * s : s] += g[:, :, :, u]
+            _scatter_unfold1d_add(x.grad, g, s)
         windows._backward = _bw_unfold1d
 
         # Reshape for single GEMM: (N*L_out, C_in*K)
@@ -923,8 +945,7 @@ class MaxPool1D(Layer):
             if not x.requires_grad:
                 return
             g = windows.grad  # (N, C, L_out, K)
-            for u in range(K):
-                x.grad[:, :, u : u + L_out * s : s] += g[:, :, :, u]
+            _scatter_unfold1d_add(x.grad, g, s)
         windows._backward = _bw_unfold1d_pool
 
         # Max over window dimension -> (N, C, L_out)
