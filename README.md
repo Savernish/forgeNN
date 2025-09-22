@@ -6,8 +6,6 @@
 - [Overview](#Overview)
 - [Performance vs PyTorch](#Performance-vs-PyTorch)
 - [Quick Start](#Quick-Start)
-- [Architecture](#Architecture)
-- [Performance](#Performance)
 - [Complete Example](#Complete-Example)
 - [Roadmap](#Roadmap)
 - [Contributing](#Contributing)
@@ -38,7 +36,9 @@ pip install "forgeNN[cuda]"
 
 ## Overview
 
-**forgeNN** is a modern neural network framework with a lean v2 API focused on a clean Sequential model, fast NumPy autograd Tensor, and a Keras-like compile/fit workflow.
+**forgeNN** is a modern neural network framework with an API built around a straightforward `Sequential` model, a fast NumPy autograd `Tensor`, and a Keras-like `compile/fit` training workflow.
+
+This project is built and maintained by a single student developer. For background and portfolio/CV, see: https://savern.me
 
 ### Key Features
 
@@ -87,21 +87,6 @@ loss, metrics = compiled.evaluate(X, y)
 # model.summary() can be called any time after construction if an Input layer or input_shape is provided.
 ```
 
-## Architecture
-
-- **Main API**: `forgeNN.Tensor`, `forgeNN.Sequential`, `forgeNN.compile`, optimizers (`SGD`, `Adam`, `AdamW`)
-
-## Performance
-
-| Implementation | Speed | MNIST Accuracy |
-|---------------|-------|----------------|
-| Sequential (compile/fit) | 40,000+ samples/sec | 95%+ in ~1s |
-
-**Highlights**:
-- **100x+ speedup** over scalar implementations
-- **Production-ready** performance with educational clarity
-- **Memory efficient** vectorized operations
-- **Smarter Losses**: `mse` auto one-hot & reshape logic; fused stable cross-entropy
 
 ## Complete Example
 
@@ -112,27 +97,36 @@ See `examples/` for full fledged demos
 - **PyPI Package**: https://pypi.org/project/forgeNN/
 - **Documentation**: v2 guides coming soon; examples in `examples/`
 - **Issues**: GitHub Issues for bug reports and feature requests
+- **Portfolio/CV**: https://savern.me
 
-## Roadmap
-### Before 2026 (2025 Remaining Milestones – ordered)
-1. ~Adam / AdamW~ 🗹 (Completed in v1.3.0) 
-2. ~Dropout + LayerNorm~ 🗹 (Completed in v1.3.0)
-3. Model saving & loading (state dict + `.npz`) ☐
-4. Conv1D → Conv2D (naive) ☐
-5. Add missing tensor ops to fully support examples ☐
-5. Tiny Transformer example (encoder-only) ☐
-6. ~ONNX export (Sequential/Dense/Flatten/activations)~ 🗹 (Completed in v2.0.0)
-7. ~ONNX import (subset)~ 🗹 (Completed in v2.0.0)
-8. Basic CUDA backend (Tensor device abstraction) ☐
-9. Documentation: serialization guide, ONNX guide, Transformer walkthrough ☐
-10. Parameter registry refinement ☐
-11. CUDA / GPU backend prototype (Tensor device abstraction) ☐
+## Roadmap (post v2.0.0)
 
-### Q1 2026 (Early 2026 Targets)
-- Formal architecture & design documents (graph execution, autograd internals)
-- Expanded documentation site (narrative design + performance notes)
+- CUDA backend and device runtime
+  - Device abstraction for `Tensor` and layers
+  - Initial CUDA kernels (Conv, GEMM, elementwise) and CPU/CUDA parity tests
+  - Setup and troubleshooting guide
 
-_Items above may be reprioritized based on user feedback; design docs explicitly deferred to early 2026._
+- ONNX: export and import (full coverage for the core API)
+  - Export `Sequential` graphs with Conv/Pool/Flatten/Dense/LayerNorm/Dropout/activations
+  - Import linear and branched graphs where feasible; shape inference checks
+  - Round‑trip parity tests and examples
+
+- Model save and load
+  - Architecture JSON + weights (NPZ) format
+  - `state_dict`/`load_state_dict` compatibility helpers
+  - Versioning and minimal migration guidance
+
+- Transformer positional encodings
+  - Sinusoidal `PositionalEncoding` and learnable `PositionalEmbedding`
+  - Tiny encoder demo with text classification walkthrough
+
+- Performance and stability
+  - CPU optimizations for conv/pool paths, memory reuse, and fewer allocations
+  - Threading guidance (MKL/OpenBLAS), deterministic runs, and profiling notes
+
+- Documentation
+  - Practical guides for `Sequential`, `compile/fit`, model I/O, ONNX, and CUDA setup
+  - Design overview of autograd and execution model
 
 ## Contributing
 
