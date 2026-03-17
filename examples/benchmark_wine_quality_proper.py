@@ -24,7 +24,7 @@ from sklearn.metrics import mean_squared_error, accuracy_score, r2_score
 import warnings
 warnings.filterwarnings('ignore')
 
-print("🍷 Wine Quality Multi-Task Benchmark: forgeNN vs PyTorch")
+print(" Wine Quality Multi-Task Benchmark: forgeNN vs PyTorch")
 print("=" * 60)
 
 # =============================================================================
